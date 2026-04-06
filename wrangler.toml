@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "pinetask"
-database_id = "YOUR_DATABASE_ID_HERE"
+database_id = "pinetask-db"
 
 [vars]
 JWT_SECRET = "alnkdsclnjcdkas21"
