@@ -467,7 +467,13 @@ function MainApp({onLogout}){
 
   // Load data from API on mount
   useEffect(()=>{
-    loadStoreFromAPI().then(data=>setStore(data)).catch(()=>setStore({_deadlines:[],_projects:[]}));
+    loadStoreFromAPI().then(data=>{
+      console.log("API response:", JSON.stringify(data));
+      setStore(data);
+    }).catch(err=>{
+      console.log("API error:", err);
+      setStore({_deadlines:[],_projects:[]});
+    });
   },[]);
 
   // Debounced save to API
