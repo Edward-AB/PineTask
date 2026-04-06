@@ -7,7 +7,3 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "pinetask-db"
 database_id = "5e1b697b-a99d-4fb5-a2eb-c2bb2da9fc55"
-
-[vars]
-JWT_SECRET = "alnkdsclnjcdkas21"
-SALT = "kjvncewjiunmklm12"
