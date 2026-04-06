@@ -20,8 +20,16 @@ async function getUserId(request, secret) {
 export async function onRequestGet({ request, env }) {
   const userId = await getUserId(request, env.JWT_SECRET);
   if (!userId) return new Response('Unauthorised', { status: 401 });
-  const row = await env.DB.prepare('SELECT data FROM store WHERE user_id = ?').bind(userId).first();
-  return Response.json(row ? JSON.parse(row.data) : {});
+  try {
+    const row = await env.DB.prepare('SELECT data FROM store WHERE user_id = ?').bind(userId).first();
+    const data = row ? JSON.parse(row.data) : {};
+    if (typeof data !== 'object' || Array.isArray(data)) return Response.json({ _deadlines: [], _projects: [] });
+    if (!data._deadlines) data._deadlines = [];
+    if (!data._projects) data._projects = [];
+    return Response.json(data);
+  } catch {
+    return Response.json({ _deadlines: [], _projects: [] });
+  }
 }
 
 export async function onRequestPost({ request, env }) {
