@@ -30,12 +30,17 @@ async function apiRequest(path,method="GET",body=null){
 }
 
 async function loadStoreFromAPI(){
-  const res=await apiRequest("/api/data");
-  if(!res.ok)return{};
-  const data=await res.json();
-  if(!data._deadlines)data._deadlines=[];
-  if(!data._projects)data._projects=[];
-  return data;
+  try{
+    const res=await apiRequest("/api/data");
+    if(!res.ok)return{_deadlines:[],_projects:[]};
+    const data=await res.json();
+    if(typeof data!=='object'||Array.isArray(data))return{_deadlines:[],_projects:[]};
+    if(!data._deadlines)data._deadlines=[];
+    if(!data._projects)data._projects=[];
+    return data;
+  }catch{
+    return{_deadlines:[],_projects:[]};
+  }
 }
 
 async function saveStoreToAPI(s){
@@ -92,6 +97,7 @@ function AuthPage({onLogin}){
       const data=await res.json();
       if(!res.ok){setError(data.error||"Something went wrong");setLoading(false);return;}
       setToken(data.token);
+      await new Promise(r => setTimeout(r, 0));
       onLogin();
     }catch{
       setError("Network error — please try again");
