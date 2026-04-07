@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import logoLight from "./assets/logo-light.png";
-import logoDark from "./assets/logo-dark.png";
+import logoLight from "./assets/logo-light.svg";
+import logoDark from "./assets/logo-dark.svg";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SLOT_H=16,SPH=4,HOUR_H=SLOT_H*SPH,CAL_E=24;
@@ -320,419 +320,649 @@ function CalTask({task,tc,pc,lay,top,height,dl,dlC,P,toggleDone,unschedule,onDra
 // ── Projects Overlay ──────────────────────────────────────────────────────────
 const DL_NAMES=["Amber","Rose","Teal","Coral","Stone","Sage"];
 
-function GanttChart({deadlines,tasks,c,t}){
-  // Build date range from all deadline start/end dates
-  const dated=deadlines.filter(dl=>dl.date);
-  if(!dated.length)return <div style={{fontSize:12,color:t.tT,padding:"12px 0"}}>Add deadlines with dates to see the timeline.</div>;
-  const allDates=[...dated.map(d=>d.startDate||d.date),...dated.map(d=>d.date)];
-  const minD=new Date(Math.min(...allDates.map(d=>new Date(d+"T12:00:00"))));
-  const maxD=new Date(Math.max(...allDates.map(d=>new Date(d+"T12:00:00"))));
-  // Pad by 2 days each side
-  minD.setDate(minD.getDate()-2); maxD.setDate(maxD.getDate()+3);
-  const totalDays=Math.max(1,Math.round((maxD-minD)/86400000));
-  const today=new Date();
-  const todayPct=Math.max(0,Math.min(100,((today-minD)/86400000/totalDays)*100));
+// ── Spreadsheet-style Gantt ───────────────────────────────────────────────────
+function GanttChart({deadlines,tasks,projStart,projEnd,t,DLC}){
+  const dated=[...deadlines].filter(dl=>dl.date).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!dated.length)return(
+    <div style={{padding:"32px 0",textAlign:"center",color:t.tT,fontSize:13}}>
+      Add deadlines with dates to see the Gantt chart.
+    </div>
+  );
 
-  function pct(dateStr){return Math.max(0,Math.min(100,((new Date(dateStr+"T12:00:00")-minD)/86400000/totalDays)*100));}
+  // Date range: use project start/end if set, otherwise derive from deadlines
+  const allD=[
+    ...(projStart?[projStart]:[]),
+    ...(projEnd?[projEnd]:[]),
+    ...dated.map(d=>d.startDate||d.date),
+    ...dated.map(d=>d.date),
+  ];
+  const minMs=Math.min(...allD.map(d=>new Date(d+"T12:00:00").getTime()));
+  const maxMs=Math.max(...allD.map(d=>new Date(d+"T12:00:00").getTime()));
+  const pad=3*86400000;
+  const rangeStart=new Date(minMs-pad);
+  const rangeEnd  =new Date(maxMs+pad);
+  const totalMs=rangeEnd-rangeStart;
+  const totalDays=Math.ceil(totalMs/86400000);
 
-  // Month tick labels
-  const ticks=[];
-  const cur=new Date(minD);cur.setDate(1);
-  while(cur<=maxD){
-    const p=((cur-minD)/86400000/totalDays)*100;
-    if(p>=0&&p<=100)ticks.push({p,label:cur.toLocaleDateString("en-GB",{month:"short",year:"2-digit"})});
-    cur.setMonth(cur.getMonth()+1);
+  function xpct(dateStr){
+    const ms=new Date(dateStr+"T12:00:00").getTime();
+    return Math.max(0,Math.min(100,((ms-rangeStart)/totalMs)*100));
   }
 
-  const ROW_H=36;
-  const LABEL_W=130;
+  const todayPct=(()=>{const ms=Date.now();return Math.max(0,Math.min(100,((ms-rangeStart)/totalMs)*100));})();
 
-  // Collect task dots per deadline
-  function dlTasks(dlId){return tasks.filter(tk=>tk.deadlineId===dlId);}
+  // Build weekly / daily ticks
+  const ticks=[];
+  const tickDate=new Date(rangeStart);tickDate.setHours(12,0,0,0);
+  // Choose tick interval based on range
+  const tickStep = totalDays<=21?1:totalDays<=90?7:30;
+  while(tickDate<=rangeEnd){
+    const p=((tickDate-rangeStart)/totalMs)*100;
+    if(p>=0&&p<=100){
+      const lbl=tickStep<7
+        ? tickDate.toLocaleDateString("en-GB",{day:"numeric",month:"short"})
+        : tickStep===7
+          ? tickDate.toLocaleDateString("en-GB",{day:"numeric",month:"short"})
+          : tickDate.toLocaleDateString("en-GB",{month:"short",year:"2-digit"});
+      ticks.push({p,lbl,isMonth:tickStep===30});
+    }
+    if(tickStep===30){tickDate.setMonth(tickDate.getMonth()+1);}
+    else{tickDate.setDate(tickDate.getDate()+tickStep);}
+  }
+
+  const LABEL_W=180;
+  const ROW_H=38;
+  const BAR_Y=10;
+  const BAR_H=18;
 
   return(
-    <div style={{overflowX:"auto",overflowY:"visible"}}>
-      <div style={{minWidth:560}}>
-        {/* Month ticks */}
-        <div style={{display:"flex",marginLeft:LABEL_W,position:"relative",height:22,marginBottom:2}}>
-          {ticks.map((tk,i)=><div key={i} style={{position:"absolute",left:`${tk.p}%`,fontSize:10,color:t.tT,whiteSpace:"nowrap",transform:"translateX(-50%)"}}>{tk.label}</div>)}
-        </div>
-        {/* Rows */}
-        {dated.map((dl,i)=>{
-          const dc=c; // use project colour for all bars
-          const start=dl.startDate?pct(dl.startDate):pct(dl.date);
-          const end=pct(dl.date);
-          const width=Math.max(0.8,end-start);
-          const dts=dlTasks(dl.id);
-          const doneCnt=dts.filter(x=>x.done).length;
-          const pctDone=dts.length>0?doneCnt/dts.length:0;
-          return(
-            <div key={dl.id} style={{display:"flex",alignItems:"center",marginBottom:6,minHeight:ROW_H}}>
-              {/* Label */}
-              <div style={{width:LABEL_W,flexShrink:0,paddingRight:10}}>
-                <div style={{fontSize:12,fontWeight:500,color:dc.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dl.title}</div>
-                <div style={{fontSize:10,color:t.tT}}>{dts.length} task{dts.length!==1?"s":""}</div>
+    <div style={{overflowX:"auto"}}>
+      <div style={{minWidth:520}}>
+        {/* ── Header row: date ticks ── */}
+        <div style={{display:"flex",marginBottom:0}}>
+          <div style={{width:LABEL_W,flexShrink:0}}/>
+          <div style={{flex:1,position:"relative",height:28,borderBottom:`1px solid ${t.border}`,background:t.bg,borderRadius:"6px 6px 0 0"}}>
+            {ticks.map((tk,i)=>(
+              <div key={i} style={{position:"absolute",left:`${tk.p}%`,top:0,bottom:0,display:"flex",flexDirection:"column",alignItems:"center"}}>
+                <div style={{flex:1,borderLeft:`1px solid ${t.border}`,opacity:0.5}}/>
+                <div style={{fontSize:9,color:t.tT,whiteSpace:"nowrap",transform:"translateX(-50%)",paddingBottom:3,fontWeight:tk.isMonth?500:400}}>{tk.lbl}</div>
               </div>
-              {/* Bar area */}
-              <div style={{flex:1,position:"relative",height:ROW_H,background:t.bg,borderRadius:6,border:`0.5px solid ${t.border}`}}>
-                {/* Today line */}
-                <div style={{position:"absolute",left:`${todayPct}%`,top:0,bottom:0,width:1.5,background:t.todL,opacity:0.6,zIndex:3,pointerEvents:"none"}}/>
-                {/* Bar */}
-                <div style={{position:"absolute",left:`${start}%`,width:`${width}%`,top:8,height:20,borderRadius:6,background:dc.bg,border:`1px solid ${dc.border}`,overflow:"hidden",zIndex:2}}>
-                  {/* Progress fill */}
-                  <div style={{height:"100%",width:`${pctDone*100}%`,background:dc.dot,opacity:0.45,borderRadius:6}}/>
+            ))}
+            {/* Today tick in header */}
+            <div style={{position:"absolute",left:`${todayPct}%`,top:0,bottom:0,borderLeft:`2px solid ${t.todL}`,opacity:0.8}}/>
+          </div>
+        </div>
+
+        {/* ── Deadline rows ── */}
+        {dated.map((dl,ri)=>{
+          const dc=DLC[dl.colorIdx%DLC.length];
+          const dlTasks=tasks.filter(tk=>tk.deadlineId===dl.id);
+          const doneCnt=dlTasks.filter(x=>x.done).length;
+          const pctDone=dlTasks.length>0?doneCnt/dlTasks.length:0;
+          const barStart=dl.startDate?xpct(dl.startDate):xpct(dl.date);
+          const barEnd=xpct(dl.date);
+          const barW=Math.max(0.5,barEnd-barStart);
+          const days=du(dl.date);
+          const overdue=days!==null&&days<0;
+          const urgent=days!==null&&days>=0&&days<=3;
+
+          return(
+            <div key={dl.id} style={{display:"flex",alignItems:"stretch",borderBottom:`1px solid ${t.border}`,minHeight:ROW_H}}>
+              {/* Label cell */}
+              <div style={{width:LABEL_W,flexShrink:0,padding:"0 12px",display:"flex",flexDirection:"column",justifyContent:"center",borderRight:`1px solid ${t.border}`,background:t.bg}}>
+                <div style={{fontSize:12,fontWeight:500,color:dc.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:1}}>{dl.title}</div>
+                <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+                  <span style={{fontSize:10,color:overdue?"#E24B4A":urgent?"#C07010":t.tT}}>{days===null?"":overdue?`${Math.abs(days)}d overdue`:days===0?"Due today":days===1?"Due tomorrow":`${days}d`}</span>
+                  {dlTasks.length>0&&<span style={{fontSize:10,color:t.tT}}>{doneCnt}/{dlTasks.length}</span>}
                 </div>
-                {/* Task dots */}
-                {dts.map(tk=>{
-                  // Place dot at the day the task is scheduled, or at deadline date
-                  const dotDate=dl.date;
-                  const dp=pct(dotDate);
-                  return(
-                    <div key={tk.id} title={tk.text} style={{position:"absolute",left:`${dp}%`,top:"50%",transform:"translate(-50%,-50%)",width:8,height:8,borderRadius:"50%",background:tk.done?dc.dot:"#fff",border:`1.5px solid ${dc.dot}`,zIndex:4,cursor:"pointer"}}/>
-                  );
-                })}
-                {/* Due date label */}
-                <div style={{position:"absolute",right:4,top:"50%",transform:"translateY(-50%)",fontSize:9,color:dc.dot,whiteSpace:"nowrap",zIndex:5}}>{fsd(dl.date)}</div>
+              </div>
+              {/* Bar cell */}
+              <div style={{flex:1,position:"relative",background:ri%2===0?t.bg:t.cBg}}>
+                {/* Grid lines */}
+                {ticks.map((tk,i)=><div key={i} style={{position:"absolute",left:`${tk.p}%`,top:0,bottom:0,borderLeft:`1px solid ${t.border}`,opacity:0.3}}/>)}
+                {/* Today vertical line */}
+                <div style={{position:"absolute",left:`${todayPct}%`,top:0,bottom:0,borderLeft:`2px solid ${t.todL}`,opacity:0.7,zIndex:3}}/>
+                {/* Bar */}
+                {barW>0&&(
+                  <div style={{position:"absolute",left:`${barStart}%`,width:`${barW}%`,top:BAR_Y,height:BAR_H,borderRadius:4,background:dc.bg,border:`1.5px solid ${dc.border}`,overflow:"hidden",zIndex:2}}>
+                    <div style={{height:"100%",width:`${pctDone*100}%`,background:dc.dot,opacity:0.5,borderRadius:4,transition:"width 0.3s"}}/>
+                  </div>
+                )}
+                {/* Due date diamond marker */}
+                <div title={`Due: ${fsd(dl.date)}`} style={{position:"absolute",left:`${xpct(dl.date)}%`,top:"50%",transform:"translate(-50%,-50%) rotate(45deg)",width:10,height:10,background:dc.dot,border:`1.5px solid ${t.bg}`,zIndex:4}}/>
+                {/* Task dots along bar */}
+                {dlTasks.map((tk,ti)=>(
+                  <div key={tk.id} title={tk.text} style={{position:"absolute",left:`${barStart+(barW*(ti+1)/(dlTasks.length+1))}%`,top:BAR_Y+BAR_H/2,transform:"translate(-50%,-50%)",width:7,height:7,borderRadius:"50%",background:tk.done?dc.dot:t.bg,border:`1.5px solid ${dc.dot}`,zIndex:5,cursor:"default"}}/>
+                ))}
               </div>
             </div>
           );
         })}
-        {/* Today legend */}
-        <div style={{display:"flex",alignItems:"center",gap:5,marginTop:6,marginLeft:LABEL_W}}>
-          <div style={{width:12,height:2,background:t.todL,borderRadius:1}}/>
-          <span style={{fontSize:10,color:t.tT}}>Today</span>
+
+        {/* Legend row */}
+        <div style={{display:"flex",alignItems:"center",gap:16,padding:"8px 0",marginLeft:LABEL_W}}>
+          <div style={{display:"flex",alignItems:"center",gap:5}}>
+            <div style={{width:16,height:2,background:t.todL,borderRadius:1}}/>
+            <span style={{fontSize:10,color:t.tT}}>Today</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:5}}>
+            <div style={{width:10,height:10,background:"transparent",border:`1.5px solid ${t.tT}`,transform:"rotate(45deg)",flexShrink:0}}/>
+            <span style={{fontSize:10,color:t.tT}}>Due date</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:5}}>
+            <div style={{width:24,height:10,borderRadius:3,background:t.border,overflow:"hidden"}}><div style={{height:"100%",width:"50%",background:t.tS}}/></div>
+            <span style={{fontSize:10,color:t.tT}}>Progress</span>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
+// ── ProjectDetail ─────────────────────────────────────────────────────────────
 function ProjectDetail({proj,store,t,theme,DLC,P,onUpdateStore,onDelete}){
   const c=DLC[proj.colorIdx%DLC.length];
-  const projDls=(Array.isArray(store._deadlines)?store._deadlines:[]).filter(d=>d.projectId===proj.id);
   const allDates=Object.keys(store).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k));
+  const projDls=(Array.isArray(store._deadlines)?store._deadlines:[]).filter(d=>d.projectId===proj.id);
   const projTasks=allDates.flatMap(k=>(Array.isArray(store[k])?store[k]:[]).filter(x=>x.projectId===proj.id));
+  const totalT=projTasks.length,doneT=projTasks.filter(x=>x.done).length;
+  const overallPct=totalT>0?Math.round(doneT/totalT*100):0;
 
-  // Selected task for detail popover
+  const [tab,setTab]=useState("manage"); // manage | analytics
+  const [selDlId,setSelDlId]=useState(null); // for Manage: which deadline is focused
   const [selTask,setSelTask]=useState(null);
-  // Active tab
-  const [tab,setTab]=useState("overview"); // overview | tasks | deadlines
 
-  // New deadline form
-  const [dlOpen,setDlOpen]=useState(false);
+  // Editing project itself
+  const [editProj,setEditProj]=useState(false);
+  const [eProjName,setEProjName]=useState(proj.name);
+  const [eProjDesc,setEProjDesc]=useState(proj.desc||"");
+  const [eProjStart,setEProjStart]=useState(proj.startDate||"");
+  const [eProjEnd,setEProjEnd]=useState(proj.endDate||"");
+  const [eProjColor,setEProjColor]=useState(proj.colorIdx);
+
+  // New / edit deadline
+  const [dlFormOpen,setDlFormOpen]=useState(false);
+  const [editDlId,setEditDlId]=useState(null);
   const [dlTitle,setDlTitle]=useState("");
   const [dlStart,setDlStart]=useState("");
   const [dlDate,setDlDate]=useState("");
   const [dlDesc,setDlDesc]=useState("");
   const [dlColor,setDlColor]=useState(proj.colorIdx);
-  // Editing deadline
-  const [editDlId,setEditDlId]=useState(null);
-  const [eDlTitle,setEDlTitle]=useState("");
-  const [eDlStart,setEDlStart]=useState("");
-  const [eDlDate,setEDlDate]=useState("");
-  const [eDlDesc,setEDlDesc]=useState("");
 
-  // New task form
-  const [taskOpen,setTaskOpen]=useState(false);
+  // New task
+  const [taskFormDlId,setTaskFormDlId]=useState(null); // which deadline's add-task form is open
   const [taskText,setTaskText]=useState("");
   const [taskPri,setTaskPri]=useState(null);
-  const [taskDlId,setTaskDlId]=useState(null);
   const [taskDur,setTaskDur]=useState(2);
 
-  const ins=style=>({width:"100%",fontSize:12,borderRadius:8,border:`0.5px solid ${t.border}`,padding:"7px 10px",background:t.sBg,color:t.tP,outline:"none",boxSizing:"border-box",...style});
-  const lbl=style=>({fontSize:10,color:t.tT,marginBottom:3,marginTop:8,...style});
+  // Edit task
+  const [editTaskId,setEditTaskId]=useState(null);
+  const [eTText,setETText]=useState("");
+  const [eTPri,setETPri]=useState(null);
+  const [eTDur,setETDur]=useState(2);
+  const [eTDlId,setETDlId]=useState(null);
 
-  function addDeadline(){
-    if(!dlTitle.trim()||!dlDate)return;
-    const nd={id:uid(),title:dlTitle.trim(),date:dlDate,startDate:dlStart||null,desc:dlDesc.trim(),colorIdx:dlColor,projectId:proj.id};
-    onUpdateStore({...store,_deadlines:[...(store._deadlines||[]),nd]});
-    setDlTitle("");setDlStart("");setDlDate("");setDlDesc("");setDlOpen(false);
+  const ins=(extra={})=>({width:"100%",fontSize:12,borderRadius:8,border:`0.5px solid ${t.border}`,padding:"7px 10px",background:t.sBg,color:t.tP,outline:"none",boxSizing:"border-box",...extra});
+  const lbl=(extra={})=>({fontSize:11,color:t.tT,marginBottom:4,display:"block",...extra});
+
+  // ── Save project edits
+  function saveProject(){
+    const updated=(store._projects||[]).map(p=>p.id===proj.id?{...p,name:eProjName.trim()||p.name,desc:eProjDesc.trim(),startDate:eProjStart||null,endDate:eProjEnd||null,colorIdx:eProjColor}:p);
+    onUpdateStore({...store,_projects:updated});setEditProj(false);
   }
-  function saveEditDl(id){
-    if(!eDlTitle.trim()||!eDlDate)return;
-    const updated=(store._deadlines||[]).map(d=>d.id===id?{...d,title:eDlTitle,startDate:eDlStart||null,date:eDlDate,desc:eDlDesc}:d);
-    onUpdateStore({...store,_deadlines:updated});setEditDlId(null);
+
+  // ── Deadlines
+  function openNewDl(){setEditDlId(null);setDlTitle("");setDlStart("");setDlDate("");setDlDesc("");setDlColor(proj.colorIdx);setDlFormOpen(true);}
+  function openEditDl(dl){setEditDlId(dl.id);setDlTitle(dl.title);setDlStart(dl.startDate||"");setDlDate(dl.date);setDlDesc(dl.desc||"");setDlColor(dl.colorIdx);setDlFormOpen(true);}
+  function saveDl(){
+    if(!dlTitle.trim()||!dlDate)return;
+    if(editDlId){
+      onUpdateStore({...store,_deadlines:(store._deadlines||[]).map(d=>d.id===editDlId?{...d,title:dlTitle.trim(),startDate:dlStart||null,date:dlDate,desc:dlDesc.trim(),colorIdx:dlColor}:d)});
+    }else{
+      const nd={id:uid(),title:dlTitle.trim(),date:dlDate,startDate:dlStart||null,desc:dlDesc.trim(),colorIdx:dlColor,projectId:proj.id};
+      onUpdateStore({...store,_deadlines:[...(store._deadlines||[]),nd]});
+    }
+    setDlFormOpen(false);setEditDlId(null);
   }
   function removeDl(id){
     const ns={...store};
-    Object.keys(ns).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).forEach(k=>{ns[k]=(ns[k]||[]).map(x=>x.deadlineId===id?{...x,deadlineId:null}:x);});
+    allDates.forEach(k=>{ns[k]=(ns[k]||[]).map(x=>x.deadlineId===id?{...x,deadlineId:null}:x);});
     ns._deadlines=(ns._deadlines||[]).filter(x=>x.id!==id);
-    onUpdateStore(ns);
+    onUpdateStore(ns);if(selDlId===id)setSelDlId(null);
   }
-  function addTask(){
+
+  // ── Tasks
+  function openTaskForm(dlId){setTaskFormDlId(dlId);setTaskText("");setTaskPri(null);setTaskDur(2);}
+  function addTask(dlId){
     if(!taskText.trim())return;
-    const today=new Date();const dateKey=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
-    const nt={id:uid(),text:taskText.trim(),priority:taskPri,dur:taskDur,slot:null,done:false,deadlineId:taskDlId||null,projectId:proj.id,note:"",colorId:null};
-    onUpdateStore({...store,[dateKey]:[...(store[dateKey]||[]),nt]});
-    setTaskText("");setTaskPri(null);setTaskDlId(null);setTaskOpen(false);
+    const today=tk();
+    const nt={id:uid(),text:taskText.trim(),priority:taskPri,dur:taskDur,slot:null,done:false,deadlineId:dlId||null,projectId:proj.id,note:"",colorId:null};
+    onUpdateStore({...store,[today]:[...(store[today]||[]),nt]});
+    setTaskFormDlId(null);setTaskText("");setTaskPri(null);
   }
-  function toggleTask(dateKey,id){
-    onUpdateStore({...store,[dateKey]:(store[dateKey]||[]).map(x=>x.id===id?{...x,done:!x.done}:x)});
+  function toggleTask(id){
+    let found=false;
+    const ns={...store};
+    allDates.forEach(k=>{if(!found){const idx=(ns[k]||[]).findIndex(x=>x.id===id);if(idx>=0){ns[k]=[...ns[k]];ns[k][idx]={...ns[k][idx],done:!ns[k][idx].done};found=true;}}});
+    if(found)onUpdateStore(ns);
   }
-  function removeTask(dateKey,id){
-    onUpdateStore({...store,[dateKey]:(store[dateKey]||[]).filter(x=>x.id!==id)});
+  function removeTask(id){
+    const ns={...store};
+    allDates.forEach(k=>{ns[k]=(ns[k]||[]).filter(x=>x.id!==id);});
+    onUpdateStore(ns);if(selTask?.id===id)setSelTask(null);if(editTaskId===id)setEditTaskId(null);
+  }
+  function openEditTask(tk2){setEditTaskId(tk2.id);setETText(tk2.text);setETPri(tk2.priority||null);setETDur(tk2.dur);setETDlId(tk2.deadlineId||null);}
+  function saveEditTask(){
+    const ns={...store};
+    allDates.forEach(k=>{const idx=(ns[k]||[]).findIndex(x=>x.id===editTaskId);if(idx>=0){ns[k]=[...ns[k]];ns[k][idx]={...ns[k][idx],text:eTText.trim()||ns[k][idx].text,priority:eTPri,dur:eTDur,deadlineId:eTDlId||null};}});
+    onUpdateStore(ns);setEditTaskId(null);
   }
 
-  const totalT=projTasks.length,doneT=projTasks.filter(x=>x.done).length;
-  const pct=totalT>0?Math.round(doneT/totalT*100):0;
+  // Tasks visible in Manage right panel
+  const visibleTasks=selDlId
+    ? projTasks.filter(x=>x.deadlineId===selDlId)
+    : projTasks;
 
-  const Tab=({id,label})=>(
-    <button onClick={()=>setTab(id)} style={{fontSize:12,padding:"5px 14px",borderRadius:20,border:`0.5px solid ${tab===id?c.border:t.border}`,background:tab===id?c.bg:"transparent",color:tab===id?c.text:t.tS,cursor:"pointer",fontWeight:tab===id?500:400}}>{label}</button>
+  const TabBtn=({id,label})=>(
+    <button onClick={()=>setTab(id)} style={{fontSize:13,padding:"7px 22px",borderRadius:20,border:`1px solid ${tab===id?c.border:t.border}`,background:tab===id?c.bg:"transparent",color:tab===id?c.text:t.tS,cursor:"pointer",fontWeight:tab===id?600:400,letterSpacing:"0.01em"}}>
+      {label}
+    </button>
   );
 
   return(
     <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0,overflow:"hidden"}}>
-      {/* Project header */}
-      <div style={{padding:"20px 24px 16px",borderBottom:`0.5px solid ${t.border}`,flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
-          <div style={{width:14,height:14,borderRadius:"50%",background:c.dot,flexShrink:0,marginTop:3}}/>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:20,fontWeight:600,color:t.tP,marginBottom:proj.desc?4:0,lineHeight:1.2}}>{proj.name}</div>
-            {proj.desc&&<div style={{fontSize:13,color:t.tS,lineHeight:1.5}}>{proj.desc}</div>}
-          </div>
-          <button onClick={onDelete} style={{fontSize:11,color:"#E24B4A",background:"none",border:"0.5px solid #E24B4A44",borderRadius:7,padding:"4px 12px",cursor:"pointer",flexShrink:0,marginTop:2}}>Delete project</button>
-        </div>
-        {/* Progress bar */}
-        <div style={{display:"flex",alignItems:"center",gap:10}}>
-          <div style={{flex:1,height:6,borderRadius:6,background:t.border,overflow:"hidden"}}>
-            <div style={{height:"100%",width:`${pct}%`,background:c.dot,borderRadius:6,transition:"width 0.4s ease"}}/>
-          </div>
-          <span style={{fontSize:12,color:c.dot,fontWeight:500,flexShrink:0}}>{doneT}/{totalT} tasks · {pct}%</span>
-        </div>
-        {/* Stats row */}
-        <div style={{display:"flex",gap:8,marginTop:12}}>
-          {[{l:"Deadlines",v:projDls.length},{l:"Total tasks",v:totalT},{l:"Done",v:doneT},{l:"Remaining",v:totalT-doneT}].map(s=>(
-            <div key={s.l} style={{flex:1,background:t.bg,border:`0.5px solid ${t.border}`,borderRadius:8,padding:"6px 10px",textAlign:"center"}}>
-              <div style={{fontSize:15,fontWeight:600,color:t.tP}}>{s.v}</div>
-              <div style={{fontSize:10,color:t.tT,marginTop:1}}>{s.l}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      {/* Tabs */}
-      <div style={{padding:"12px 24px 0",borderBottom:`0.5px solid ${t.border}`,display:"flex",gap:6,flexShrink:0}}>
-        <Tab id="overview" label="Timeline"/><Tab id="tasks" label="Tasks"/><Tab id="deadlines" label="Deadlines"/>
-      </div>
-      {/* Content */}
-      <div style={{flex:1,overflowY:"auto",padding:"20px 24px"}}>
 
-        {/* ── TIMELINE TAB ── */}
-        {tab==="overview"&&(
-          <div>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-              <div style={{fontSize:13,fontWeight:500,color:t.tP}}>Gantt timeline</div>
-              <button onClick={()=>{setTab("deadlines");setDlOpen(true);}} style={{fontSize:11,padding:"4px 12px",borderRadius:7,border:`0.5px solid ${c.border}`,background:c.bg,color:c.text,cursor:"pointer"}}>+ Add deadline</button>
+      {/* ── Project header ── */}
+      <div style={{padding:"22px 28px 18px",borderBottom:`1px solid ${t.border}`,flexShrink:0}}>
+        {editProj?(
+          <div style={{display:"flex",flexDirection:"column",gap:0}}>
+            <div style={{display:"flex",gap:10,marginBottom:10}}>
+              <div style={{flex:2}}>
+                <label style={lbl()}>Project name</label>
+                <input value={eProjName} onChange={e=>setEProjName(e.target.value)} style={ins()}/>
+              </div>
+              <div style={{flex:3}}>
+                <label style={lbl()}>Description</label>
+                <input value={eProjDesc} onChange={e=>setEProjDesc(e.target.value)} placeholder="Optional" style={ins()}/>
+              </div>
+              <div style={{flex:1}}>
+                <label style={lbl()}>Colour</label>
+                <select value={eProjColor} onChange={e=>setEProjColor(Number(e.target.value))} style={{...ins(),background:DLC[eProjColor].bg,color:DLC[eProjColor].text,border:`0.5px solid ${DLC[eProjColor].border}`}}>
+                  {DLC.map((_,i)=><option key={i} value={i}>{DL_NAMES[i]}</option>)}
+                </select>
+              </div>
             </div>
-            <GanttChart deadlines={projDls} tasks={projTasks} c={c} t={t}/>
-            {projDls.length>0&&projTasks.length>0&&(
-              <div style={{marginTop:20}}>
-                <div style={{fontSize:10,fontWeight:500,color:t.tT,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:10}}>Task breakdown</div>
-                {projDls.map(dl=>{
-                  const dlT=projTasks.filter(x=>x.deadlineId===dl.id);
-                  if(!dlT.length)return null;
-                  const dc2=DLC[dl.colorIdx%DLC.length];
-                  const days=du(dl.date);
-                  return(
-                    <div key={dl.id} style={{marginBottom:14}}>
-                      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
-                        <span style={{width:8,height:8,borderRadius:"50%",background:dc2.dot,display:"inline-block",flexShrink:0}}/>
-                        <span style={{fontSize:12,fontWeight:500,color:dc2.text}}>{dl.title}</span>
-                        <span style={{fontSize:11,color:days<0?"#E24B4A":days<=3?"#C07010":t.tT,marginLeft:"auto"}}>{days===null?"no date":days<0?`${Math.abs(days)}d overdue`:days===0?"due today":days===1?"due tomorrow":`${days}d left`}</span>
-                      </div>
-                      {dlT.map(tk=>(
-                        <div key={tk.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 10px",borderRadius:7,background:tk.done?t.bg:dc2.bg+"55",border:`0.5px solid ${t.border}`,marginBottom:4,cursor:"pointer"}} onClick={()=>setSelTask(selTask?.id===tk.id?null:tk)}>
-                          <span style={{width:6,height:6,borderRadius:"50%",background:P[tk.priority||"none"].dot,flexShrink:0}}/>
-                          <span style={{flex:1,fontSize:12,color:tk.done?t.tT:t.tP,textDecoration:tk.done?"line-through":"none"}}>{tk.text}</span>
-                          <PriorityTag priority={tk.priority} P={P}/>
-                          <span style={{fontSize:10,color:t.tT}}>{tk.dur*15}m</span>
+            <div style={{display:"flex",gap:10,marginBottom:12}}>
+              <div style={{flex:1}}>
+                <label style={lbl()}>Project start date</label>
+                <input type="date" value={eProjStart} onChange={e=>setEProjStart(e.target.value)} style={ins()}/>
+              </div>
+              <div style={{flex:1}}>
+                <label style={lbl()}>Project end date</label>
+                <input type="date" value={eProjEnd} onChange={e=>setEProjEnd(e.target.value)} style={ins()}/>
+              </div>
+              <div style={{flex:2}}/>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveProject} style={{background:t.aBtn,border:"none",borderRadius:8,padding:"7px 20px",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Save changes</button>
+              <button onClick={()=>setEditProj(false)} style={{background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:8,padding:"7px 16px",cursor:"pointer",color:t.tS,fontSize:12}}>Cancel</button>
+            </div>
+          </div>
+        ):(
+          <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
+            <div style={{width:16,height:16,borderRadius:"50%",background:c.dot,flexShrink:0,marginTop:4}}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:"flex",alignItems:"baseline",gap:12,flexWrap:"wrap"}}>
+                <div style={{fontSize:22,fontWeight:700,color:t.tP,lineHeight:1.1}}>{proj.name}</div>
+                {(proj.startDate||proj.endDate)&&(
+                  <div style={{fontSize:12,color:t.tT}}>
+                    {proj.startDate&&fsd(proj.startDate)}{proj.startDate&&proj.endDate?" – ":""}{proj.endDate&&fsd(proj.endDate)}
+                  </div>
+                )}
+              </div>
+              {proj.desc&&<div style={{fontSize:13,color:t.tS,marginTop:3}}>{proj.desc}</div>}
+              {/* Overall progress bar */}
+              <div style={{display:"flex",alignItems:"center",gap:10,marginTop:10}}>
+                <div style={{flex:1,maxWidth:300,height:6,borderRadius:6,background:t.border,overflow:"hidden"}}>
+                  <div style={{height:"100%",width:`${overallPct}%`,background:c.dot,borderRadius:6,transition:"width 0.4s"}}/>
+                </div>
+                <span style={{fontSize:12,color:c.dot,fontWeight:600}}>{overallPct}%</span>
+                <span style={{fontSize:12,color:t.tT}}>{doneT} of {totalT} tasks done</span>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8,flexShrink:0}}>
+              <button onClick={()=>setEditProj(true)} style={{fontSize:12,padding:"6px 14px",borderRadius:8,border:`0.5px solid ${t.border}`,background:"transparent",color:t.tS,cursor:"pointer"}}>Edit</button>
+              <button onClick={onDelete} style={{fontSize:12,padding:"6px 14px",borderRadius:8,border:"0.5px solid #E24B4A44",background:"transparent",color:"#E24B4A",cursor:"pointer"}}>Delete</button>
+            </div>
+          </div>
+        )}
+
+        {/* Stats pills */}
+        {!editProj&&(
+          <div style={{display:"flex",gap:10,marginTop:16}}>
+            {[
+              {l:"Deadlines",v:projDls.length,col:c.dot},
+              {l:"Total tasks",v:totalT,col:t.tP},
+              {l:"Done",v:doneT,col:"#2D9B6F"},
+              {l:"Remaining",v:totalT-doneT,col:t.tS},
+              ...(projDls.length>0?[{l:"On track",v:projDls.filter(d=>{const day=du(d.date);return day!==null&&day>=0;}).length,col:c.dot}]:[]),
+            ].map(s=>(
+              <div key={s.l} style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:10,padding:"8px 14px",textAlign:"center",minWidth:70}}>
+                <div style={{fontSize:18,fontWeight:700,color:s.col,lineHeight:1}}>{s.v}</div>
+                <div style={{fontSize:10,color:t.tT,marginTop:2,whiteSpace:"nowrap"}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Tabs ── */}
+      <div style={{padding:"14px 28px 0",borderBottom:`1px solid ${t.border}`,display:"flex",gap:8,flexShrink:0}}>
+        <TabBtn id="manage" label="Manage"/>
+        <TabBtn id="analytics" label="Analytics"/>
+      </div>
+
+      {/* ── Content ── */}
+      <div style={{flex:1,overflowY:"auto",minHeight:0}}>
+
+        {/* ══ MANAGE TAB ══ */}
+        {tab==="manage"&&(
+          <div style={{display:"flex",height:"100%",minHeight:0}}>
+
+            {/* Left: deadlines list */}
+            <div style={{width:260,flexShrink:0,borderRight:`1px solid ${t.border}`,display:"flex",flexDirection:"column",overflowY:"auto"}}>
+              <div style={{padding:"16px 16px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`0.5px solid ${t.border}`,flexShrink:0}}>
+                <span style={{fontSize:12,fontWeight:600,color:t.tP}}>Deadlines</span>
+                <button onClick={openNewDl} style={{fontSize:11,padding:"4px 10px",borderRadius:7,border:`0.5px solid ${c.border}`,background:c.bg,color:c.text,cursor:"pointer"}}>+ Add</button>
+              </div>
+
+              {/* "All tasks" option */}
+              <button onClick={()=>setSelDlId(null)} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 16px",borderLeft:`3px solid ${selDlId===null?c.dot:"transparent"}`,background:selDlId===null?c.bg+"66":"transparent",cursor:"pointer",border:"none",textAlign:"left",width:"100%",borderLeft:`3px solid ${selDlId===null?c.dot:"transparent"}`}}>
+                <span style={{fontSize:12,color:selDlId===null?c.text:t.tS,fontWeight:selDlId===null?600:400}}>All tasks ({projTasks.length})</span>
+              </button>
+
+              {/* Deadline form */}
+              {dlFormOpen&&(
+                <div style={{padding:"12px 14px",background:t.bg,borderBottom:`0.5px solid ${t.border}`}}>
+                  <div style={{fontSize:11,fontWeight:500,color:t.tP,marginBottom:8}}>{editDlId?"Edit deadline":"New deadline"}</div>
+                  <input value={dlTitle} onChange={e=>setDlTitle(e.target.value)} placeholder="Title" style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"6px 9px",background:t.sBg,color:t.tP,marginBottom:6,boxSizing:"border-box",outline:"none"}}/>
+                  <div style={{display:"flex",gap:6,marginBottom:6}}>
+                    <div style={{flex:1}}><div style={{fontSize:10,color:t.tT,marginBottom:2}}>Start</div><input type="date" value={dlStart} onChange={e=>setDlStart(e.target.value)} style={{width:"100%",fontSize:11,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 6px",background:t.sBg,color:t.tP,boxSizing:"border-box",outline:"none"}}/></div>
+                    <div style={{flex:1}}><div style={{fontSize:10,color:t.tT,marginBottom:2}}>Due</div><input type="date" value={dlDate} onChange={e=>setDlDate(e.target.value)} style={{width:"100%",fontSize:11,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 6px",background:t.sBg,color:t.tP,boxSizing:"border-box",outline:"none"}}/></div>
+                  </div>
+                  <input value={dlDesc} onChange={e=>setDlDesc(e.target.value)} placeholder="Description (optional)" style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"6px 9px",background:t.sBg,color:t.tP,marginBottom:6,boxSizing:"border-box",outline:"none"}}/>
+                  <select value={dlColor} onChange={e=>setDlColor(Number(e.target.value))} style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${DLC[dlColor].border}`,padding:"5px 8px",background:DLC[dlColor].bg,color:DLC[dlColor].text,marginBottom:8,outline:"none"}}>
+                    {DLC.map((_,i)=><option key={i} value={i}>{DL_NAMES[i]}</option>)}
+                  </select>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={saveDl} style={{flex:1,background:t.aBtn,border:"none",borderRadius:7,padding:"6px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Save</button>
+                    <button onClick={()=>setDlFormOpen(false)} style={{flex:1,background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:7,padding:"6px 0",cursor:"pointer",color:t.tS,fontSize:12}}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Deadline list */}
+              {projDls.length===0&&!dlFormOpen&&(
+                <div style={{fontSize:12,color:t.tT,textAlign:"center",padding:"24px 16px"}}>No deadlines yet.</div>
+              )}
+              {[...projDls].sort((a,b)=>a.date.localeCompare(b.date)).map(dl=>{
+                const dc=DLC[dl.colorIdx%DLC.length];
+                const active=selDlId===dl.id;
+                const dlT=projTasks.filter(x=>x.deadlineId===dl.id);
+                const dlDone=dlT.filter(x=>x.done).length;
+                const days=du(dl.date);
+                const ov=days!==null&&days<0;
+                const urg=days!==null&&days>=0&&days<=3;
+                return(
+                  <div key={dl.id} style={{borderLeft:`3px solid ${active?dc.dot:"transparent"}`,background:active?dc.bg+"55":"transparent"}}>
+                    <button onClick={()=>setSelDlId(active?null:dl.id)} style={{display:"flex",alignItems:"flex-start",gap:8,padding:"10px 14px",cursor:"pointer",background:"transparent",border:"none",textAlign:"left",width:"100%"}}>
+                      <span style={{width:8,height:8,borderRadius:"50%",background:dc.dot,flexShrink:0,marginTop:3}}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:active?600:400,color:active?dc.text:t.tP,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dl.title}</div>
+                        <div style={{fontSize:10,color:ov?"#E24B4A":urg?"#C07010":t.tT,marginTop:1}}>
+                          {ov?`${Math.abs(days)}d overdue`:days===0?"Due today":days===1?"Tomorrow":`${days}d left`}
+                          {dlT.length>0&&<span style={{color:t.tT}}> · {dlDone}/{dlT.length}</span>}
                         </div>
-                      ))}
+                        {/* Mini progress bar */}
+                        {dlT.length>0&&<div style={{height:3,borderRadius:2,background:t.border,overflow:"hidden",marginTop:4}}><div style={{height:"100%",width:`${Math.round(dlDone/dlT.length*100)}%`,background:dc.dot,borderRadius:2}}/></div>}
+                      </div>
+                    </button>
+                    {active&&(
+                      <div style={{display:"flex",gap:5,padding:"0 14px 8px",paddingLeft:30}}>
+                        <button onClick={()=>openEditDl(dl)} style={{fontSize:10,padding:"2px 8px",borderRadius:5,border:`0.5px solid ${dc.border}`,background:"transparent",color:dc.text,cursor:"pointer"}}>Edit</button>
+                        <button onClick={()=>removeDl(dl.id)} style={{fontSize:10,padding:"2px 8px",borderRadius:5,border:"0.5px solid #E24B4A44",background:"transparent",color:"#E24B4A",cursor:"pointer"}}>Remove</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Right: tasks panel */}
+            <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0,overflowY:"auto"}}>
+              <div style={{padding:"16px 20px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`0.5px solid ${t.border}`,flexShrink:0}}>
+                <div style={{fontSize:12,fontWeight:600,color:t.tP}}>
+                  {selDlId?(()=>{const dl=projDls.find(d=>d.id===selDlId);return dl?dl.title:"Tasks";})():"All tasks"}
+                  <span style={{fontWeight:400,color:t.tT}}> — {visibleTasks.length} task{visibleTasks.length!==1?"s":""}</span>
+                </div>
+                <button onClick={()=>openTaskForm(selDlId)} style={{fontSize:11,padding:"4px 12px",borderRadius:7,border:`0.5px solid ${c.border}`,background:c.bg,color:c.text,cursor:"pointer"}}>+ Add task</button>
+              </div>
+
+              {/* Add task form */}
+              {taskFormDlId!==undefined&&taskFormDlId!==false&&(taskFormDlId===selDlId||taskFormDlId===null)&&taskText!==false&&(
+                taskFormDlId===selDlId||taskFormDlId===null
+              )&&false===false&&(
+                <div/>
+              )}
+              {taskFormDlId!==undefined&&(
+                <div style={{padding:"12px 20px",background:t.bg,borderBottom:`0.5px solid ${t.border}`}}>
+                  <input value={taskText} onChange={e=>setTaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask(taskFormDlId)} placeholder="Task name…" style={{width:"100%",fontSize:13,borderRadius:8,border:`0.5px solid ${t.border}`,padding:"7px 11px",background:t.sBg,color:t.tP,outline:"none",marginBottom:8,boxSizing:"border-box"}}/>
+                  <div style={{display:"flex",gap:8,marginBottom:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,color:t.tT,marginBottom:3}}>Priority</div>
+                      <select value={taskPri||""} onChange={e=>setTaskPri(e.target.value||null)} style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 8px",background:t.sBg,color:t.tP,outline:"none"}}>
+                        <option value="">None</option>
+                        {["high","medium","low"].map(p=><option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                      </select>
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,color:t.tT,marginBottom:3}}>Duration</div>
+                      <select value={taskDur} onChange={e=>setTaskDur(Number(e.target.value))} style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 8px",background:t.sBg,color:t.tP,outline:"none"}}>
+                        {[1,2,3,4,6,8].map(s=><option key={s} value={s}>{s*15} min</option>)}
+                      </select>
+                    </div>
+                    {!selDlId&&projDls.length>0&&(
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:10,color:t.tT,marginBottom:3}}>Deadline</div>
+                        <select value={taskFormDlId||""} onChange={e=>setTaskFormDlId(e.target.value||null)} style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 8px",background:t.sBg,color:t.tP,outline:"none"}}>
+                          <option value="">None</option>
+                          {projDls.map(d=><option key={d.id} value={d.id}>{d.title}</option>)}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{display:"flex",gap:6}}>
+                    <button onClick={()=>addTask(taskFormDlId)} style={{flex:1,background:t.aBtn,border:"none",borderRadius:8,padding:"7px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Add task</button>
+                    <button onClick={()=>{setTaskFormDlId(undefined);setTaskText("");}} style={{flex:1,background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:8,padding:"7px 0",cursor:"pointer",color:t.tS,fontSize:12}}>Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Task list */}
+              <div style={{padding:"8px 20px 16px"}}>
+                {visibleTasks.length===0&&taskFormDlId===undefined&&(
+                  <div style={{fontSize:13,color:t.tT,textAlign:"center",padding:"32px 0"}}>
+                    {selDlId?"No tasks linked to this deadline.":"No tasks in this project yet."}
+                  </div>
+                )}
+                {visibleTasks.map(tk=>{
+                  const pc=P[tk.priority||"none"];
+                  const dlLabel=projDls.find(d=>d.id===tk.deadlineId);
+                  const dlC=dlLabel?DLC[dlLabel.colorIdx%DLC.length]:null;
+                  const isEditingThis=editTaskId===tk.id;
+                  const isExpanded=selTask?.id===tk.id&&!isEditingThis;
+                  return(
+                    <div key={tk.id} style={{borderRadius:10,border:`1px solid ${isExpanded?c.border:t.border}`,background:isExpanded?c.bg+"33":t.bg,marginBottom:6,overflow:"hidden"}}>
+                      {isEditingThis?(
+                        <div style={{padding:"12px 14px"}}>
+                          <input value={eTText} onChange={e=>setETText(e.target.value)} style={{width:"100%",fontSize:13,borderRadius:8,border:`0.5px solid ${t.border}`,padding:"7px 10px",background:t.sBg,color:t.tP,outline:"none",marginBottom:8,boxSizing:"border-box"}}/>
+                          <div style={{display:"flex",gap:8,marginBottom:8}}>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:10,color:t.tT,marginBottom:3}}>Priority</div>
+                              <select value={eTPri||""} onChange={e=>setETPri(e.target.value||null)} style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 8px",background:t.sBg,color:t.tP,outline:"none"}}>
+                                <option value="">None</option>
+                                {["high","medium","low"].map(p=><option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                              </select>
+                            </div>
+                            <div style={{flex:1}}>
+                              <div style={{fontSize:10,color:t.tT,marginBottom:3}}>Duration</div>
+                              <select value={eTDur} onChange={e=>setETDur(Number(e.target.value))} style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 8px",background:t.sBg,color:t.tP,outline:"none"}}>
+                                {[1,2,3,4,6,8].map(s=><option key={s} value={s}>{s*15} min</option>)}
+                              </select>
+                            </div>
+                            {projDls.length>0&&(
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:10,color:t.tT,marginBottom:3}}>Deadline</div>
+                                <select value={eTDlId||""} onChange={e=>setETDlId(e.target.value||null)} style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 8px",background:t.sBg,color:t.tP,outline:"none"}}>
+                                  <option value="">None</option>
+                                  {projDls.map(d=><option key={d.id} value={d.id}>{d.title}</option>)}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                          <div style={{display:"flex",gap:6}}>
+                            <button onClick={saveEditTask} style={{flex:1,background:t.aBtn,border:"none",borderRadius:7,padding:"6px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Save</button>
+                            <button onClick={()=>setEditTaskId(null)} style={{flex:1,background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:7,padding:"6px 0",cursor:"pointer",color:t.tS,fontSize:12}}>Cancel</button>
+                          </div>
+                        </div>
+                      ):(
+                        <>
+                          <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",cursor:"pointer"}} onClick={()=>setSelTask(isExpanded?null:tk)}>
+                            <input type="checkbox" checked={tk.done} onChange={e=>{e.stopPropagation();toggleTask(tk.id);}} style={{width:14,height:14,flexShrink:0,cursor:"pointer"}}/>
+                            <span style={{flex:1,fontSize:13,color:tk.done?t.tT:t.tP,textDecoration:tk.done?"line-through":"none",lineHeight:1.3}}>{tk.text}</span>
+                            <PriorityTag priority={tk.priority} P={P}/>
+                            <span style={{fontSize:11,color:t.tT,whiteSpace:"nowrap"}}>{tk.dur*15}m</span>
+                            {dlLabel&&dlC&&!selDlId&&<span style={{fontSize:10,padding:"2px 7px",borderRadius:20,background:dlC.bg,color:dlC.text,border:`0.5px solid ${dlC.border}`,whiteSpace:"nowrap",maxWidth:90,overflow:"hidden",textOverflow:"ellipsis"}}>{dlLabel.title}</span>}
+                            <div style={{display:"flex",gap:4,flexShrink:0}} onClick={e=>e.stopPropagation()}>
+                              <button onClick={()=>openEditTask(tk)} style={{fontSize:10,padding:"2px 8px",borderRadius:5,border:`0.5px solid ${t.border}`,background:"transparent",color:t.tS,cursor:"pointer"}}>Edit</button>
+                              <button onClick={()=>removeTask(tk.id)} style={{fontSize:11,background:"none",border:"none",color:"#E24B4A",cursor:"pointer",padding:"0 2px",lineHeight:1}}>×</button>
+                            </div>
+                          </div>
+                          {isExpanded&&(
+                            <div style={{padding:"0 14px 12px 38px",borderTop:`0.5px solid ${t.border}`}}>
+                              <div style={{display:"flex",gap:16,fontSize:12,color:t.tS,marginTop:8,flexWrap:"wrap"}}>
+                                <span>Priority: <strong style={{color:pc.text}}>{tk.priority||"none"}</strong></span>
+                                <span>Duration: <strong>{tk.dur*15} min</strong></span>
+                                <span>Status: <strong style={{color:tk.done?"#2D9B6F":t.tP}}>{tk.done?"Done":"To do"}</strong></span>
+                                {tk.slot!=null&&<span>Scheduled: <strong>{s2t(tk.slot)}</strong></span>}
+                                {dlLabel&&<span>Deadline: <strong style={{color:dlC?.text}}>{dlLabel.title}</strong></span>}
+                              </div>
+                              {tk.note&&<div style={{fontSize:12,color:t.tS,marginTop:8,padding:"8px 10px",background:t.sBg,borderRadius:7,lineHeight:1.6}}>{tk.note}</div>}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   );
                 })}
               </div>
-            )}
+            </div>
           </div>
         )}
 
-        {/* ── TASKS TAB ── */}
-        {tab==="tasks"&&(
-          <div>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-              <div style={{fontSize:13,fontWeight:500,color:t.tP}}>{projTasks.length} task{projTasks.length!==1?"s":""}</div>
-              <button onClick={()=>setTaskOpen(v=>!v)} style={{fontSize:11,padding:"4px 12px",borderRadius:7,border:`0.5px solid ${c.border}`,background:taskOpen?c.bg:"transparent",color:c.text,cursor:"pointer"}}>+ Add task</button>
-            </div>
-            {taskOpen&&(
-              <div style={{background:t.bg,border:`0.5px solid ${t.border}`,borderRadius:12,padding:16,marginBottom:16}}>
-                <div style={lbl({marginTop:0})}>Task name</div>
-                <input value={taskText} onChange={e=>setTaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="What needs to be done?" style={ins({marginBottom:2})}/>
-                <div style={{display:"flex",gap:8,marginTop:10}}>
-                  <div style={{flex:1}}>
-                    <div style={lbl({marginTop:0})}>Priority</div>
-                    <select value={taskPri||""} onChange={e=>setTaskPri(e.target.value||null)} style={ins({})}>
-                      <option value="">None</option>
-                      {["high","medium","low"].map(p=><option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
-                    </select>
-                  </div>
-                  <div style={{flex:1}}>
-                    <div style={lbl({marginTop:0})}>Duration</div>
-                    <select value={taskDur} onChange={e=>setTaskDur(Number(e.target.value))} style={ins({})}>
-                      {[1,2,3,4,6,8].map(s=><option key={s} value={s}>{s*15} min</option>)}
-                    </select>
-                  </div>
-                  <div style={{flex:1}}>
-                    <div style={lbl({marginTop:0})}>Deadline</div>
-                    <select value={taskDlId||""} onChange={e=>setTaskDlId(e.target.value||null)} style={ins({})}>
-                      <option value="">None</option>
-                      {projDls.map(d=><option key={d.id} value={d.id}>{d.title}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div style={{display:"flex",gap:8,marginTop:12}}>
-                  <button onClick={addTask} style={{flex:1,background:t.aBtn,border:"none",borderRadius:8,padding:"8px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Add task</button>
-                  <button onClick={()=>setTaskOpen(false)} style={{flex:1,background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:8,padding:"8px 0",cursor:"pointer",color:t.tS,fontSize:12}}>Cancel</button>
-                </div>
+        {/* ══ ANALYTICS TAB ══ */}
+        {tab==="analytics"&&(
+          <div style={{padding:"24px 28px"}}>
+            {/* Overall donut + stats side by side */}
+            <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:32,alignItems:"start",marginBottom:32}}>
+              {/* Pie */}
+              <div style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:14,padding:"20px 24px"}}>
+                <div style={{fontSize:12,fontWeight:600,color:t.tP,marginBottom:14,textTransform:"uppercase",letterSpacing:"0.06em"}}>Task breakdown</div>
+                <PieDt tasks={projTasks} t={t}/>
               </div>
-            )}
-            {projTasks.length===0&&!taskOpen&&<div style={{fontSize:12,color:t.tT,textAlign:"center",padding:"30px 0"}}>No tasks yet. Add one above.</div>}
-            {/* Group by deadline */}
-            {projDls.map(dl=>{
-              const dlT=projTasks.filter(x=>x.deadlineId===dl.id);
-              if(!dlT.length)return null;
-              const dc2=DLC[dl.colorIdx%DLC.length];
-              return(
-                <div key={dl.id} style={{marginBottom:16}}>
-                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
-                    <span style={{width:8,height:8,borderRadius:"50%",background:dc2.dot,display:"inline-block"}}/>
-                    <span style={{fontSize:12,fontWeight:500,color:dc2.text}}>{dl.title}</span>
-                    <span style={{fontSize:10,color:t.tT}}>{fsd(dl.date)}</span>
-                  </div>
-                  {dlT.map(tk=>{
-                    const dateKey=allDates.find(d=>(store[d]||[]).some(x=>x.id===tk.id));
+              {/* Deadline progress bars */}
+              <div style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:14,padding:"20px 24px"}}>
+                <div style={{fontSize:12,fontWeight:600,color:t.tP,marginBottom:14,textTransform:"uppercase",letterSpacing:"0.06em"}}>Deadline progress</div>
+                {projDls.length===0&&<div style={{fontSize:12,color:t.tT}}>No deadlines yet.</div>}
+                {[...projDls].sort((a,b)=>a.date.localeCompare(b.date)).map(dl=>{
+                  const dc=DLC[dl.colorIdx%DLC.length];
+                  const dlT=projTasks.filter(x=>x.deadlineId===dl.id);
+                  const done2=dlT.filter(x=>x.done).length;
+                  const p=dlT.length>0?Math.round(done2/dlT.length*100):0;
+                  const days=du(dl.date);
+                  const ov=days!==null&&days<0;
+                  const urg=days!==null&&days>=0&&days<=3;
+                  return(
+                    <div key={dl.id} style={{marginBottom:14}}>
+                      <div style={{display:"flex",alignItems:"baseline",gap:8,marginBottom:5}}>
+                        <span style={{width:8,height:8,borderRadius:"50%",background:dc.dot,display:"inline-block",flexShrink:0}}/>
+                        <span style={{fontSize:13,fontWeight:500,color:dc.text,flex:1}}>{dl.title}</span>
+                        <span style={{fontSize:11,color:ov?"#E24B4A":urg?"#C07010":t.tT,whiteSpace:"nowrap"}}>
+                          {ov?`${Math.abs(days)}d overdue`:days===0?"Due today":days===1?"Due tomorrow":`${days}d left`}
+                        </span>
+                        <span style={{fontSize:12,fontWeight:600,color:dc.dot,minWidth:32,textAlign:"right"}}>{p}%</span>
+                      </div>
+                      <div style={{height:8,borderRadius:4,background:t.border,overflow:"hidden"}}>
+                        <div style={{height:"100%",width:`${p}%`,background:dc.dot,borderRadius:4,transition:"width 0.4s"}}/>
+                      </div>
+                      <div style={{fontSize:10,color:t.tT,marginTop:3}}>{done2}/{dlT.length} tasks · {fsd(dl.startDate||dl.date)}{dl.startDate?" → ":""}{dl.startDate&&fsd(dl.date)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Gantt timeline */}
+            <div style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:14,padding:"20px 24px",marginBottom:24}}>
+              <div style={{fontSize:12,fontWeight:600,color:t.tP,marginBottom:16,textTransform:"uppercase",letterSpacing:"0.06em"}}>Gantt timeline</div>
+              <GanttChart deadlines={projDls} tasks={projTasks} projStart={proj.startDate||null} projEnd={proj.endDate||null} t={t} DLC={DLC}/>
+            </div>
+
+            {/* Priority breakdown per deadline */}
+            {projDls.length>0&&(
+              <div style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:14,padding:"20px 24px",marginBottom:24}}>
+                <div style={{fontSize:12,fontWeight:600,color:t.tP,marginBottom:14,textTransform:"uppercase",letterSpacing:"0.06em"}}>Priority distribution</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:10}}>
+                  {[...projDls].sort((a,b)=>a.date.localeCompare(b.date)).map(dl=>{
+                    const dc=DLC[dl.colorIdx%DLC.length];
+                    const dlT=projTasks.filter(x=>x.deadlineId===dl.id);
+                    const byPri=["high","medium","low","none"].map(p=>({p,cnt:dlT.filter(x=>(x.priority||"none")===p).length})).filter(x=>x.cnt>0);
                     return(
-                      <div key={tk.id}>
-                        <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,background:t.bg,border:`0.5px solid ${selTask?.id===tk.id?c.border:t.border}`,marginBottom:4,cursor:"pointer"}} onClick={()=>setSelTask(selTask?.id===tk.id?null:tk)}>
-                          <input type="checkbox" checked={tk.done} onChange={e=>{e.stopPropagation();if(dateKey)toggleTask(dateKey,tk.id);}} style={{width:13,height:13,flexShrink:0,cursor:"pointer"}}/>
-                          <span style={{flex:1,fontSize:12,color:tk.done?t.tT:t.tP,textDecoration:tk.done?"line-through":"none"}}>{tk.text}</span>
-                          <PriorityTag priority={tk.priority} P={P}/>
-                          <span style={{fontSize:10,color:t.tT}}>{tk.dur*15}m</span>
-                          <button onClick={e=>{e.stopPropagation();if(dateKey)removeTask(dateKey,tk.id);}} style={{background:"none",border:"none",color:"#E24B4A",cursor:"pointer",fontSize:14,padding:0,lineHeight:1}}>×</button>
-                        </div>
-                        {selTask?.id===tk.id&&(
-                          <div style={{background:c.bg+"88",border:`0.5px solid ${c.border}`,borderRadius:8,padding:"10px 12px",marginBottom:8,marginTop:-2}}>
-                            <div style={{fontSize:12,fontWeight:500,color:c.text,marginBottom:6}}>{tk.text}</div>
-                            <div style={{display:"flex",gap:12,fontSize:11,color:t.tS,flexWrap:"wrap"}}>
-                              <span>Priority: <strong>{tk.priority||"none"}</strong></span>
-                              <span>Duration: <strong>{tk.dur*15}m</strong></span>
-                              <span>Status: <strong style={{color:tk.done?t.acc:t.tP}}>{tk.done?"Done":"To do"}</strong></span>
-                              {tk.slot!=null&&<span>Scheduled: <strong>{s2t(tk.slot)}</strong></span>}
-                            </div>
-                            {tk.note&&<div style={{fontSize:11,color:t.tS,marginTop:8,padding:"6px 8px",background:t.sBg,borderRadius:6,lineHeight:1.6}}>{tk.note}</div>}
+                      <div key={dl.id} style={{background:dc.bg+"66",border:`0.5px solid ${dc.border}`,borderRadius:10,padding:"10px 12px"}}>
+                        <div style={{fontSize:12,fontWeight:500,color:dc.text,marginBottom:7,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dl.title}</div>
+                        {byPri.length===0?<div style={{fontSize:11,color:t.tT}}>No tasks</div>:byPri.map(({p,cnt})=>(
+                          <div key={p} style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                            <span style={{width:7,height:7,borderRadius:"50%",background:P[p].dot,display:"inline-block",flexShrink:0}}/>
+                            <span style={{fontSize:11,color:t.tS,flex:1,textTransform:"capitalize"}}>{p}</span>
+                            <span style={{fontSize:11,fontWeight:600,color:t.tP}}>{cnt}</span>
                           </div>
-                        )}
+                        ))}
                       </div>
                     );
                   })}
                 </div>
-              );
-            })}
-            {/* Unlinked tasks */}
-            {(()=>{const unlinked=projTasks.filter(x=>!x.deadlineId||!projDls.find(d=>d.id===x.deadlineId));if(!unlinked.length)return null;return(
-              <div style={{marginBottom:16}}>
-                <div style={{fontSize:11,color:t.tT,fontWeight:500,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:8}}>No deadline</div>
-                {unlinked.map(tk=>{
-                  const dateKey=allDates.find(d=>(store[d]||[]).some(x=>x.id===tk.id));
-                  return(
-                    <div key={tk.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,background:t.bg,border:`0.5px solid ${t.border}`,marginBottom:4}}>
-                      <input type="checkbox" checked={tk.done} onChange={()=>{if(dateKey)toggleTask(dateKey,tk.id);}} style={{width:13,height:13,flexShrink:0,cursor:"pointer"}}/>
-                      <span style={{flex:1,fontSize:12,color:tk.done?t.tT:t.tP,textDecoration:tk.done?"line-through":"none"}}>{tk.text}</span>
-                      <PriorityTag priority={tk.priority} P={P}/>
-                      <button onClick={()=>{if(dateKey)removeTask(dateKey,tk.id);}} style={{background:"none",border:"none",color:"#E24B4A",cursor:"pointer",fontSize:14,padding:0,lineHeight:1}}>×</button>
-                    </div>
-                  );
-                })}
-              </div>
-            );})()}
-          </div>
-        )}
-
-        {/* ── DEADLINES TAB ── */}
-        {tab==="deadlines"&&(
-          <div>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-              <div style={{fontSize:13,fontWeight:500,color:t.tP}}>{projDls.length} deadline{projDls.length!==1?"s":""}</div>
-              <button onClick={()=>setDlOpen(v=>!v)} style={{fontSize:11,padding:"4px 12px",borderRadius:7,border:`0.5px solid ${c.border}`,background:dlOpen?c.bg:"transparent",color:c.text,cursor:"pointer"}}>+ Add deadline</button>
-            </div>
-            {dlOpen&&(
-              <div style={{background:t.bg,border:`0.5px solid ${t.border}`,borderRadius:12,padding:16,marginBottom:16}}>
-                <div style={lbl({marginTop:0})}>Title</div>
-                <input value={dlTitle} onChange={e=>setDlTitle(e.target.value)} placeholder="Deadline title" style={ins({})}/>
-                <div style={{display:"flex",gap:8,marginTop:10}}>
-                  <div style={{flex:1}}><div style={lbl({marginTop:0})}>Start date (optional)</div><input type="date" value={dlStart} onChange={e=>setDlStart(e.target.value)} style={ins({})}/></div>
-                  <div style={{flex:1}}><div style={lbl({marginTop:0})}>Due date</div><input type="date" value={dlDate} onChange={e=>setDlDate(e.target.value)} style={ins({})}/></div>
-                </div>
-                <div style={lbl()}>Description (optional)</div>
-                <input value={dlDesc} onChange={e=>setDlDesc(e.target.value)} placeholder="Notes about this deadline" style={ins({})}/>
-                <div style={lbl()}>Colour</div>
-                <select value={dlColor} onChange={e=>setDlColor(Number(e.target.value))} style={{...ins({}),background:DLC[dlColor].bg,color:DLC[dlColor].text,border:`0.5px solid ${DLC[dlColor].border}`}}>
-                  {DLC.map((_,i)=><option key={i} value={i}>{DL_NAMES[i]}</option>)}
-                </select>
-                <div style={{display:"flex",gap:8,marginTop:12}}>
-                  <button onClick={addDeadline} style={{flex:1,background:t.aBtn,border:"none",borderRadius:8,padding:"8px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Add deadline</button>
-                  <button onClick={()=>setDlOpen(false)} style={{flex:1,background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:8,padding:"8px 0",cursor:"pointer",color:t.tS,fontSize:12}}>Cancel</button>
-                </div>
               </div>
             )}
-            {projDls.length===0&&!dlOpen&&<div style={{fontSize:12,color:t.tT,textAlign:"center",padding:"30px 0"}}>No deadlines yet. Add one above.</div>}
-            {[...projDls].sort((a,b)=>a.date.localeCompare(b.date)).map(dl=>{
-              const dc2=DLC[dl.colorIdx%DLC.length];
-              const dlT=projTasks.filter(x=>x.deadlineId===dl.id);
-              const doneT2=dlT.filter(x=>x.done).length;
-              const days=du(dl.date);
-              const isEd=editDlId===dl.id;
-              return(
-                <div key={dl.id} style={{background:dc2.bg+"99",border:`0.5px solid ${dc2.border}`,borderRadius:12,padding:"14px 16px",marginBottom:10}}>
-                  {isEd?(
-                    <div>
-                      <input value={eDlTitle} onChange={e=>setEDlTitle(e.target.value)} style={ins({marginBottom:8})}/>
-                      <div style={{display:"flex",gap:8,marginBottom:8}}>
-                        <div style={{flex:1}}><div style={lbl({marginTop:0})}>Start</div><input type="date" value={eDlStart} onChange={e=>setEDlStart(e.target.value)} style={ins({})}/></div>
-                        <div style={{flex:1}}><div style={lbl({marginTop:0})}>Due</div><input type="date" value={eDlDate} onChange={e=>setEDlDate(e.target.value)} style={ins({})}/></div>
-                      </div>
-                      <input value={eDlDesc} onChange={e=>setEDlDesc(e.target.value)} placeholder="Description" style={ins({marginBottom:10})}/>
-                      <div style={{display:"flex",gap:6}}>
-                        <button onClick={()=>saveEditDl(dl.id)} style={{flex:1,background:t.aBtn,border:"none",borderRadius:7,padding:"6px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Save</button>
-                        <button onClick={()=>setEditDlId(null)} style={{flex:1,background:"transparent",border:`0.5px solid ${dc2.border}`,borderRadius:7,padding:"6px 0",cursor:"pointer",color:dc2.text,fontSize:12}}>Cancel</button>
-                      </div>
-                    </div>
-                  ):(
-                    <>
-                      <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:8}}>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:14,fontWeight:600,color:dc2.text,marginBottom:2}}>{dl.title}</div>
-                          {dl.desc&&<div style={{fontSize:12,color:dc2.text,opacity:0.75,marginBottom:4}}>{dl.desc}</div>}
-                          <div style={{display:"flex",gap:12,fontSize:11,color:dc2.dot,flexWrap:"wrap"}}>
-                            {dl.startDate&&<span>Start: {fsd(dl.startDate)}</span>}
-                            <span>Due: {fsd(dl.date)}</span>
-                            <span style={{color:days<0?"#E24B4A":days<=3?"#C07010":dc2.dot,fontWeight:500}}>{days===null?"":days<0?`${Math.abs(days)}d overdue`:days===0?"Due today":days===1?"Due tomorrow":`${days}d left`}</span>
-                          </div>
-                        </div>
-                        <div style={{display:"flex",gap:6,flexShrink:0}}>
-                          <button onClick={()=>{setEditDlId(dl.id);setEDlTitle(dl.title);setEDlStart(dl.startDate||"");setEDlDate(dl.date);setEDlDesc(dl.desc||"");}} style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:`0.5px solid ${dc2.border}`,background:"transparent",color:dc2.text,cursor:"pointer"}}>Edit</button>
-                          <button onClick={()=>removeDl(dl.id)} style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:"0.5px solid #E24B4A44",background:"transparent",color:"#E24B4A",cursor:"pointer"}}>Remove</button>
-                        </div>
-                      </div>
-                      {/* Progress */}
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:dlT.length?10:0}}>
-                        <div style={{flex:1,height:4,borderRadius:4,background:dc2.border+"44",overflow:"hidden"}}><div style={{height:"100%",width:`${dlT.length>0?Math.round(doneT2/dlT.length*100):0}%`,background:dc2.dot,borderRadius:4}}/></div>
-                        <span style={{fontSize:11,color:dc2.dot,whiteSpace:"nowrap"}}>{doneT2}/{dlT.length} done</span>
-                      </div>
-                      {dlT.map(tk=><div key={tk.id} style={{display:"flex",alignItems:"center",gap:7,fontSize:11,padding:"3px 4px"}}><span style={{display:"inline-block",width:5,height:5,borderRadius:"50%",background:P[tk.priority||"none"].dot,flexShrink:0}}/><span style={{flex:1,color:tk.done?t.tT:dc2.text,textDecoration:tk.done?"line-through":"none"}}>{tk.text}</span></div>)}
-                    </>
-                  )}
-                </div>
-              );
-            })}
+
+            {/* Key metrics */}
+            <div style={{background:t.bg,border:`1px solid ${t.border}`,borderRadius:14,padding:"20px 24px"}}>
+              <div style={{fontSize:12,fontWeight:600,color:t.tP,marginBottom:14,textTransform:"uppercase",letterSpacing:"0.06em"}}>Key metrics</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:10}}>
+                {[
+                  {l:"Overall completion",v:`${overallPct}%`,col:c.dot},
+                  {l:"Deadlines on track",v:`${projDls.filter(d=>{const d2=du(d.date);return d2!==null&&d2>=0;}).length} / ${projDls.length}`,col:"#2D9B6F"},
+                  {l:"Overdue deadlines",v:String(projDls.filter(d=>{const d2=du(d.date);return d2!==null&&d2<0;}).length),col:"#E24B4A"},
+                  {l:"Avg tasks/deadline",v:projDls.length>0?(projTasks.length/projDls.length).toFixed(1):"—",col:t.tS},
+                  {l:"High priority tasks",v:String(projTasks.filter(x=>x.priority==="high"&&!x.done).length),col:"#639922"},
+                  {l:"Scheduled tasks",v:String(projTasks.filter(x=>x.slot!=null).length),col:c.dot},
+                ].map(m=>(
+                  <div key={m.l} style={{padding:"12px 16px",background:t.cBg,border:`0.5px solid ${t.border}`,borderRadius:10}}>
+                    <div style={{fontSize:20,fontWeight:700,color:m.col,lineHeight:1}}>{m.v}</div>
+                    <div style={{fontSize:11,color:t.tT,marginTop:4}}>{m.l}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -740,6 +970,7 @@ function ProjectDetail({proj,store,t,theme,DLC,P,onUpdateStore,onDelete}){
   );
 }
 
+// ── ProjectsOverlay shell ─────────────────────────────────────────────────────
 function ProjectsOverlay({store,t,theme,DLC,P,onClose,onUpdateStore}){
   const projects=Array.isArray(store._projects)?store._projects:[];
   const [sel,setSel]=useState(projects.length>0?projects[0].id:null);
@@ -750,51 +981,58 @@ function ProjectsOverlay({store,t,theme,DLC,P,onClose,onUpdateStore}){
 
   function addProject(){
     if(!newName.trim())return;
-    const np={id:uid(),name:newName.trim(),desc:newDesc.trim(),colorIdx:newColor};
+    const np={id:uid(),name:newName.trim(),desc:newDesc.trim(),colorIdx:newColor,startDate:null,endDate:null};
     onUpdateStore({...store,_projects:[...projects,np]});
-    setNewName("");setNewDesc("");setNewColor(0);setAddOpen(false);
-    setSel(np.id);
+    setNewName("");setNewDesc("");setNewColor(0);setAddOpen(false);setSel(np.id);
   }
   function deleteProject(id){
     const ns={...store};
-    // Remove projectId from all tasks
-    Object.keys(ns).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).forEach(k=>{ns[k]=(ns[k]||[]).map(x=>x.projectId===id?{...x,projectId:null}:x);});
-    // Remove deadlines belonging to project
+    allD(ns).forEach(k=>{ns[k]=(ns[k]||[]).map(x=>x.projectId===id?{...x,projectId:null}:x);});
     const dlIds=new Set((ns._deadlines||[]).filter(d=>d.projectId===id).map(d=>d.id));
-    Object.keys(ns).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).forEach(k=>{ns[k]=(ns[k]||[]).map(x=>dlIds.has(x.deadlineId)?{...x,deadlineId:null}:x);});
+    allD(ns).forEach(k=>{ns[k]=(ns[k]||[]).map(x=>dlIds.has(x.deadlineId)?{...x,deadlineId:null}:x);});
     ns._deadlines=(ns._deadlines||[]).filter(d=>d.projectId!==id);
     ns._projects=(ns._projects||[]).filter(p=>p.id!==id);
-    onUpdateStore(ns);
-    setSel(projects.filter(p=>p.id!==id)[0]?.id||null);
+    onUpdateStore(ns);setSel(projects.filter(p=>p.id!==id)[0]?.id||null);
   }
+  function allD(s){return Object.keys(s).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k));}
 
   const selP=sel?projects.find(p=>p.id===sel):null;
 
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{background:t.cBg,borderRadius:20,width:"min(1100px,96vw)",height:"min(780px,88vh)",display:"flex",overflow:"hidden",boxShadow:"0 24px 80px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:"16px"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:t.cBg,borderRadius:20,width:"min(1200px,97vw)",height:"min(840px,92vh)",display:"flex",overflow:"hidden",boxShadow:"0 28px 90px rgba(0,0,0,0.32)"}} onClick={e=>e.stopPropagation()}>
+
         {/* ── Sidebar ── */}
-        <div style={{width:230,flexShrink:0,borderRight:`0.5px solid ${t.border}`,display:"flex",flexDirection:"column",background:t.bg}}>
-          {/* Header */}
-          <div style={{padding:"20px 18px 14px",borderBottom:`0.5px solid ${t.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-            <span style={{fontSize:14,fontWeight:600,color:t.tP}}>Projects</span>
-            <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:t.tT,fontSize:20,lineHeight:1,padding:0}}>×</button>
+        <div style={{width:220,flexShrink:0,borderRight:`1px solid ${t.border}`,display:"flex",flexDirection:"column",background:t.bg}}>
+          <div style={{padding:"20px 18px 14px",borderBottom:`1px solid ${t.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:14,fontWeight:700,color:t.tP}}>Projects</span>
+            <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:t.tT,fontSize:22,lineHeight:1,padding:0}}>×</button>
           </div>
-          {/* Project list */}
-          <div style={{flex:1,overflowY:"auto",padding:"10px 10px 0"}}>
+          <div style={{flex:1,overflowY:"auto",padding:"8px 8px 0"}}>
             {projects.length===0&&<div style={{fontSize:12,color:t.tT,textAlign:"center",padding:"24px 8px"}}>No projects yet.</div>}
-            {projects.map(p=>{const c=DLC[p.colorIdx%DLC.length];const active=sel===p.id;return(
-              <button key={p.id} onClick={()=>setSel(p.id)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 10px",borderRadius:10,border:`0.5px solid ${active?c.border:"transparent"}`,background:active?c.bg+"CC":"transparent",cursor:"pointer",marginBottom:3,textAlign:"left",width:"100%",transition:"all 0.15s"}}>
-                <span style={{width:9,height:9,borderRadius:"50%",background:c.dot,flexShrink:0}}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:12,fontWeight:active?600:400,color:active?c.text:t.tP,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                  {p.desc&&<div style={{fontSize:10,color:t.tT,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>{p.desc}</div>}
-                </div>
-              </button>
-            );})}
+            {projects.map(p=>{
+              const c2=DLC[p.colorIdx%DLC.length];const active=sel===p.id;
+              const pDls=(store._deadlines||[]).filter(d=>d.projectId===p.id);
+              const pTasks=allD(store).flatMap(k=>(store[k]||[]).filter(x=>x.projectId===p.id));
+              const pDone=pTasks.filter(x=>x.done).length;
+              const ppct=pTasks.length>0?Math.round(pDone/pTasks.length*100):0;
+              return(
+                <button key={p.id} onClick={()=>setSel(p.id)} style={{display:"flex",flexDirection:"column",padding:"10px 10px",borderRadius:10,border:`1px solid ${active?c2.border:"transparent"}`,background:active?c2.bg+"BB":"transparent",cursor:"pointer",marginBottom:4,textAlign:"left",width:"100%"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                    <span style={{width:9,height:9,borderRadius:"50%",background:c2.dot,flexShrink:0}}/>
+                    <span style={{fontSize:12,fontWeight:active?600:400,color:active?c2.text:t.tP,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1}}>{p.name}</span>
+                  </div>
+                  {pTasks.length>0&&(
+                    <div style={{paddingLeft:17}}>
+                      <div style={{height:3,borderRadius:2,background:t.border,overflow:"hidden",marginBottom:2}}><div style={{height:"100%",width:`${ppct}%`,background:c2.dot,borderRadius:2}}/></div>
+                      <div style={{fontSize:10,color:t.tT}}>{ppct}% · {pDls.length} dl · {pTasks.length} tasks</div>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          {/* Add project */}
-          <div style={{padding:"10px",borderTop:`0.5px solid ${t.border}`}}>
+          <div style={{padding:"10px 8px",borderTop:`1px solid ${t.border}`}}>
             {addOpen?(
               <div>
                 <input value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addProject()} placeholder="Project name" style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"6px 8px",background:t.sBg,color:t.tP,marginBottom:5,boxSizing:"border-box",outline:"none"}}/>
@@ -809,16 +1047,17 @@ function ProjectsOverlay({store,t,theme,DLC,P,onClose,onUpdateStore}){
               </div>
             ):(
               <button onClick={()=>setAddOpen(true)} style={{width:"100%",background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:9,padding:"7px 0",cursor:"pointer",color:t.tS,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
-                <span style={{fontSize:15,lineHeight:1}}>+</span> New project
+                <span style={{fontSize:14,lineHeight:1}}>+</span> New project
               </button>
             )}
           </div>
         </div>
-        {/* ── Main area ── */}
+
+        {/* ── Main ── */}
         {!selP?(
           <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,color:t.tT}}>
-            <div style={{fontSize:32,opacity:0.3}}>📋</div>
-            <div style={{fontSize:13}}>Select or create a project</div>
+            <div style={{fontSize:36,opacity:0.2}}>📋</div>
+            <div style={{fontSize:13}}>Select or create a project to get started</div>
           </div>
         ):(
           <ProjectDetail key={selP.id} proj={selP} store={store} t={t} theme={theme} DLC={DLC} P={P} onUpdateStore={onUpdateStore} onDelete={()=>deleteProject(selP.id)}/>
@@ -827,7 +1066,6 @@ function ProjectsOverlay({store,t,theme,DLC,P,onClose,onUpdateStore}){
     </div>
   );
 }
-
 // ── Auth page ─────────────────────────────────────────────────────────────────
 function AuthPage({onLogin}){
   const [mode,setMode]=useState("login");
