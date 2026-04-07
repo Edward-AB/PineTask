@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import logoLight from "./assets/logo-light.png";
-import logoDark from "./assets/logo-dark.png";
+import logoLight from "./assets/logo-light.svg";
+import logoDark from "./assets/logo-dark.svg";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SLOT_H=16,SPH=4,HOUR_H=SLOT_H*SPH,CAL_E=24;
@@ -23,7 +23,7 @@ function du(str){if(!str)return null;return Math.ceil((new Date(str+"T12:00:00")
 function fd(d){return d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"});}
 function fsd(str){if(!str)return "";return new Date(str+"T12:00:00").toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});}
 function s2t(s){const h=Math.floor(s/SPH),m=(s%SPH)*15;return`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;}
-function greet(name){const h=new Date().getHours();const g=h<12?"Good morning":h<17?"Good afternoon":"Good evening";if(name&&name.trim().length>0&&name.trim().length<=12)return`${g}, ${name.trim()}`;return g;}
+function greet(username){const h=new Date().getHours();const g=h<12?"Good morning":h<17?"Good afternoon":"Good evening";if(username&&username.trim().length>0&&username.trim().length<=20)return`${g}, ${username.trim()}`;return g;}
 function fc(d){return d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});}
 function nowY(){const n=new Date();return(n.getHours()*60+n.getMinutes()+n.getSeconds()/60)/60*HOUR_H;}
 let _id=Date.now();function uid(){return String(++_id);}
@@ -64,13 +64,13 @@ async function loadStoreFromAPI(){
 async function saveStoreToAPI(data){
   try{await apiRequest("/api/data",{method:"POST",body:JSON.stringify(data)});}catch{}
 }
-// Decode firstName from JWT payload
-function getFirstNameFromToken(){
+// Decode username from JWT payload
+function getUsernameFromToken(){
   try{
     const token=getToken();
     if(!token)return null;
     const payload=JSON.parse(atob(token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/")));
-    return payload.firstName||null;
+    return payload.username||null;
   }catch{return null;}
 }
 
@@ -296,22 +296,31 @@ function TaskItem({task,isScheduled,deadlines,DLC,P,t,theme,toggleDone,removeTas
 }
 
 function CalTask({task,tc,pc,lay,top,height,dl,dlC,P,toggleDone,unschedule,onDragStart,onDragEnd,onResize,t}){
+  // narrow = sharing column with another task; tall = enough vertical room to stack
   const narrow=lay.colPct<=55;
+  const tall=height>=SLOT_H*3; // 45+ min — enough room to stack text above tags
+  const Tags=()=><div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"nowrap",overflow:"hidden"}}>
+    <PriorityTag priority={task.priority} P={P}/>
+    <span style={{fontSize:9,color:tc.dot,whiteSpace:"nowrap"}}>{s2t(task.slot)}·{task.dur*15}m</span>
+    {dl&&dlC&&<span style={{padding:"1px 4px",borderRadius:5,background:dlC.bg,color:dlC.text,border:`0.5px solid ${dlC.border}`,fontSize:9,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:70}}>{dl.title}</span>}
+  </div>;
   return(
-    <div className="cpill trow" draggable onDragStart={e=>onDragStart(e,task)} onDragEnd={onDragEnd} style={{position:"absolute",left:`${lay.leftPct}%`,width:`calc(${lay.colPct}% - 4px)`,top,height,background:tc.bg,border:`1px solid ${tc.border}`,borderRadius:9,padding:"3px 6px",cursor:"grab",display:"flex",alignItems:narrow?"flex-start":"center",gap:3,overflow:"hidden"}}>
-      <input type="checkbox" checked={task.done} onChange={()=>toggleDone(task.id)} onClick={e=>e.stopPropagation()} style={{width:10,height:10,flexShrink:0,accentColor:pc.dot,marginTop:narrow?2:0}}/>
-      {narrow?(
-        <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:2}}>
-          <span style={{fontSize:11,fontWeight:500,color:task.done?tc.border:tc.text,textDecoration:task.done?"line-through":"none",lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.text}</span>
-          <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:3}}><PriorityTag priority={task.priority} P={P}/><span style={{fontSize:9,color:tc.dot,whiteSpace:"nowrap"}}>{s2t(task.slot)}·{task.dur*15}m</span>{dl&&dlC&&<span style={{padding:"1px 4px",borderRadius:5,background:dlC.bg,color:dlC.text,border:`0.5px solid ${dlC.border}`,fontSize:9,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:80}}>{dl.title}</span>}</div>
+    <div className="cpill trow" draggable onDragStart={e=>onDragStart(e,task)} onDragEnd={onDragEnd} style={{position:"absolute",left:`${lay.leftPct}%`,width:`calc(${lay.colPct}% - 4px)`,top,height,background:tc.bg,border:`1px solid ${tc.border}`,borderRadius:9,padding:"3px 6px",cursor:"grab",display:"flex",alignItems:tall?"flex-start":"center",gap:3,overflow:"hidden",boxSizing:"border-box"}}>
+      <input type="checkbox" checked={task.done} onChange={()=>toggleDone(task.id)} onClick={e=>e.stopPropagation()} style={{width:10,height:10,flexShrink:0,accentColor:pc.dot,marginTop:tall?3:0}}/>
+      {tall?(
+        // Stacked layout: text on top, tags below
+        <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:2,paddingTop:1}}>
+          <span style={{fontSize:11,fontWeight:500,color:task.done?tc.border:tc.text,textDecoration:task.done?"line-through":"none",lineHeight:1.3,overflow:"hidden",textOverflow:"ellipsis",display:"-webkit-box",WebkitLineClamp:narrow?2:4,WebkitBoxOrient:"vertical"}}>{task.text}</span>
+          <Tags/>
         </div>
       ):(
+        // Inline layout: text + tags side by side, single row
         <>
-          <span style={{fontSize:11,fontWeight:500,color:task.done?tc.border:tc.text,textDecoration:task.done?"line-through":"none",flex:1,minWidth:0,lineHeight:1.3,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical"}}>{task.text}</span>
-          <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}><PriorityTag priority={task.priority} P={P}/><span style={{fontSize:9,color:tc.dot,whiteSpace:"nowrap"}}>{s2t(task.slot)}·{task.dur*15}m</span>{dl&&dlC&&<span style={{padding:"1px 4px",borderRadius:5,background:dlC.bg,color:dlC.text,border:`0.5px solid ${dlC.border}`,fontSize:9,whiteSpace:"nowrap"}}>{dl.title}</span>}</div>
+          <span style={{fontSize:11,fontWeight:500,color:task.done?tc.border:tc.text,textDecoration:task.done?"line-through":"none",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.3}}>{task.text}</span>
+          <Tags/>
         </>
       )}
-      <button onClick={e=>{e.stopPropagation();unschedule(task.id);}} style={{background:"none",border:"none",cursor:"pointer",color:tc.dot,fontSize:10,padding:0,lineHeight:1,flexShrink:0,alignSelf:narrow?"flex-start":"center",marginTop:narrow?1:0}}>↩</button>
+      <button onClick={e=>{e.stopPropagation();unschedule(task.id);}} style={{background:"none",border:"none",cursor:"pointer",color:tc.dot,fontSize:10,padding:0,lineHeight:1,flexShrink:0,alignSelf:tall?"flex-start":"center",marginTop:tall?3:0}}>↩</button>
       <div className="rh" onMouseDown={e=>onResize(e,task)}><div style={{width:20,height:2.5,borderRadius:2,background:tc.border,opacity:0.9}}/></div>
     </div>
   );
@@ -1071,14 +1080,14 @@ function AuthPage({onLogin}){
   const [mode,setMode]=useState("login");
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
-  const [firstName,setFirstName]=useState("");
+  const [username,setUsername]=useState("");
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(false);
 
   async function handleSubmit(e){
     e.preventDefault();setError("");setLoading(true);
     try{
-      const body=mode==="signup"?{email,password,firstName:firstName.trim()}:{email,password};
+      const body=mode==="signup"?{email,password,username:username.trim()}:{email,password};
       const res=await fetch(`/api/auth/${mode}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       const data=await res.json();
       if(!res.ok){setError(data.error||"Something went wrong");setLoading(false);return;}
@@ -1103,7 +1112,7 @@ function AuthPage({onLogin}){
           <div style={{fontSize:20,fontWeight:600,color:"#2C2C2A",marginBottom:6}}>{mode==="login"?"Welcome back":"Create account"}</div>
           <div style={{fontSize:13,color:"#5F5E5A",marginBottom:24}}>{mode==="login"?"Sign in to your PineTask account":"Get started with PineTask for free"}</div>
           <form onSubmit={handleSubmit}>
-            {mode==="signup"&&<input value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="First name (optional)" style={inputStyle}/>}
+            {mode==="signup"&&<input value={username} onChange={e=>setUsername(e.target.value)} placeholder="Username (e.g. ed)" required style={inputStyle}/>}
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email address" required style={inputStyle}/>
             <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" required minLength={6} style={{...inputStyle,marginBottom:16}}/>
             {error&&<div style={{fontSize:13,color:"#E24B4A",marginBottom:12,padding:"8px 12px",background:"rgba(226,75,74,0.08)",borderRadius:8,border:"0.5px solid rgba(226,75,74,0.3)"}}>{error}</div>}
@@ -1240,7 +1249,7 @@ function MainApp({onLogout}){
   const sched=tasks.filter(x=>x.slot!=null).sort((a,b)=>a.slot-b.slot);
   const done=tasks.filter(x=>x.done).length,total=tasks.length;
   const cLayout=computeCols(sched);
-  const firstName=getFirstNameFromToken();
+  const username=getUsernameFromToken();
   const tmFmt=timerSt?`${String(Math.floor(timerSt.remaining/60)).padStart(2,"0")}:${String(timerSt.remaining%60).padStart(2,"0")}`:null;
 
   // ── Actions ────────────────────────────────────────────────────────────────
@@ -1298,8 +1307,8 @@ function MainApp({onLogout}){
       {/* Card 1: Greeting + week/month */}
       <div style={{background:t.cBg,border:`0.5px solid ${t.border}`,borderRadius:14,padding:"16px",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14}}>
-          <div><div style={{fontSize:16,fontWeight:500,color:t.tP,marginBottom:2}}>{greet(firstName)}</div><div style={{fontSize:12,color:t.tS}}>{total>0?`${done} of ${total} tasks done today`:"Nothing planned yet"}</div></div>
-          <div style={{display:"flex",border:`0.5px solid ${t.border}`,borderRadius:8,overflow:"hidden",flexShrink:0,marginLeft:8}}>{["week","month"].map(v=>(<button key={v} onClick={()=>setCv(v)} style={{padding:"4px 9px",fontSize:11,cursor:"pointer",background:cv===v?t.acc:"transparent",color:cv===v?t.aBtnTx:t.tS,border:"none",fontWeight:cv===v?500:400}}>{v.charAt(0).toUpperCase()+v.slice(1)}</button>))}</div>
+          <div><div style={{fontSize:16,fontWeight:500,color:t.tP,marginBottom:2}}>{greet(username)}</div><div style={{fontSize:12,color:t.tS}}>{total>0?`${done} of ${total} tasks done today`:"Nothing planned yet"}</div></div>
+          <div style={{display:"flex",border:`0.5px solid ${t.border}`,borderRadius:8,overflow:"hidden",flexShrink:0,marginLeft:8}}>{["week","month"].map(v=>(<button key={v} onClick={()=>setCv(v)} style={{padding:"4px 9px",fontSize:11,cursor:"pointer",background:cv===v?t.selDB:"transparent",color:cv===v?"#fff":t.tS,border:"none",fontWeight:cv===v?600:400}}>{v.charAt(0).toUpperCase()+v.slice(1)}</button>))}</div>
         </div>
         {cv==="week"?<WeekStrip date={date} setDate={setDate} store={store} deadlines={deadlines} t={t}/>:<MonthCal date={date} setDate={setDate} store={store} deadlines={deadlines} t={t}/>}
       </div>
@@ -1363,6 +1372,7 @@ function MainApp({onLogout}){
     <div style={{background:t.hBg,borderBottom:`0.5px solid ${t.hBorder}`,padding:"0 20px",display:"grid",gridTemplateColumns:"1fr auto 1fr",alignItems:"center",height:52,flexShrink:0,position:"sticky",top:0,zIndex:100}}>
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         <img src={theme==="dark"?logoDark:logoLight} alt="PineTask" style={{height:28,maxWidth:120,objectFit:"contain"}} onError={e=>e.target.style.display="none"}/>
+        {username&&<span style={{fontSize:12,color:t.hText,opacity:0.75,fontWeight:400,letterSpacing:"0.01em"}}>@{username}</span>}
         <div style={{width:"0.5px",height:18,background:t.hBorder}}/>
         <button onClick={()=>setShowProjects(true)} style={{height:30,borderRadius:8,border:`0.5px solid ${t.hBorder}`,background:"rgba(128,128,128,0.08)",color:t.hText,cursor:"pointer",display:"flex",alignItems:"center",gap:5,padding:"0 10px",fontSize:11,fontWeight:500}}>
           <svg width={12} height={12} viewBox="0 0 14 14" fill="none"><rect x={0.7} y={0.7} width={5} height={5} rx={1.3} stroke={t.hText} strokeWidth={1.2}/><rect x={8.3} y={0.7} width={5} height={5} rx={1.3} stroke={t.hText} strokeWidth={1.2}/><rect x={0.7} y={8.3} width={5} height={5} rx={1.3} stroke={t.hText} strokeWidth={1.2}/><rect x={8.3} y={8.3} width={5} height={5} rx={1.3} stroke={t.hText} strokeWidth={1.2}/></svg>
@@ -1429,8 +1439,8 @@ function MainApp({onLogout}){
           {/* Greeting card */}
           <div style={{background:t.cBg,border:`0.5px solid ${t.border}`,borderRadius:14,padding:"14px 16px"}}>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:12}}>
-              <div><div style={{fontSize:15,fontWeight:500,color:t.tP,marginBottom:1}}>{greet(firstName)}</div><div style={{fontSize:11,color:t.tS}}>{total>0?`${done} of ${total} tasks done today`:"Nothing planned yet"}</div></div>
-              <div style={{display:"flex",border:`0.5px solid ${t.border}`,borderRadius:8,overflow:"hidden",flexShrink:0,marginLeft:8}}>{["week","month"].map(v=>(<button key={v} onClick={()=>setCv(v)} style={{padding:"3px 8px",fontSize:11,cursor:"pointer",background:cv===v?t.acc:"transparent",color:cv===v?t.aBtnTx:t.tS,border:"none"}}>{v.charAt(0).toUpperCase()+v.slice(1)}</button>))}</div>
+              <div><div style={{fontSize:15,fontWeight:500,color:t.tP,marginBottom:1}}>{greet(username)}</div><div style={{fontSize:11,color:t.tS}}>{total>0?`${done} of ${total} tasks done today`:"Nothing planned yet"}</div></div>
+              <div style={{display:"flex",border:`0.5px solid ${t.border}`,borderRadius:8,overflow:"hidden",flexShrink:0,marginLeft:8}}>{["week","month"].map(v=>(<button key={v} onClick={()=>setCv(v)} style={{padding:"3px 8px",fontSize:11,cursor:"pointer",background:cv===v?t.selDB:"transparent",color:cv===v?"#fff":t.tS,border:"none",fontWeight:cv===v?600:400}}>{v.charAt(0).toUpperCase()+v.slice(1)}</button>))}</div>
             </div>
             {cv==="week"?<WeekStrip date={date} setDate={setDate} store={store} deadlines={deadlines} t={t}/>:<MonthCal date={date} setDate={setDate} store={store} deadlines={deadlines} t={t}/>}
           </div>
