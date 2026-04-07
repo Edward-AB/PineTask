@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import logoLight from "./assets/logo-light.png";
-import logoDark from "./assets/logo-dark.png";
+import logoLight from "./assets/logo-light.svg";
+import logoDark from "./assets/logo-dark.svg";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SLOT_H=16,SPH=4,HOUR_H=SLOT_H*SPH,CAL_E=24;
@@ -317,61 +317,512 @@ function CalTask({task,tc,pc,lay,top,height,dl,dlC,P,toggleDone,unschedule,onDra
   );
 }
 
+// ── Projects Overlay ──────────────────────────────────────────────────────────
+const DL_NAMES=["Amber","Rose","Teal","Coral","Stone","Sage"];
+
+function GanttChart({deadlines,tasks,c,t}){
+  // Build date range from all deadline start/end dates
+  const dated=deadlines.filter(dl=>dl.date);
+  if(!dated.length)return <div style={{fontSize:12,color:t.tT,padding:"12px 0"}}>Add deadlines with dates to see the timeline.</div>;
+  const allDates=[...dated.map(d=>d.startDate||d.date),...dated.map(d=>d.date)];
+  const minD=new Date(Math.min(...allDates.map(d=>new Date(d+"T12:00:00"))));
+  const maxD=new Date(Math.max(...allDates.map(d=>new Date(d+"T12:00:00"))));
+  // Pad by 2 days each side
+  minD.setDate(minD.getDate()-2); maxD.setDate(maxD.getDate()+3);
+  const totalDays=Math.max(1,Math.round((maxD-minD)/86400000));
+  const today=new Date();
+  const todayPct=Math.max(0,Math.min(100,((today-minD)/86400000/totalDays)*100));
+
+  function pct(dateStr){return Math.max(0,Math.min(100,((new Date(dateStr+"T12:00:00")-minD)/86400000/totalDays)*100));}
+
+  // Month tick labels
+  const ticks=[];
+  const cur=new Date(minD);cur.setDate(1);
+  while(cur<=maxD){
+    const p=((cur-minD)/86400000/totalDays)*100;
+    if(p>=0&&p<=100)ticks.push({p,label:cur.toLocaleDateString("en-GB",{month:"short",year:"2-digit"})});
+    cur.setMonth(cur.getMonth()+1);
+  }
+
+  const ROW_H=36;
+  const LABEL_W=130;
+
+  // Collect task dots per deadline
+  function dlTasks(dlId){return tasks.filter(tk=>tk.deadlineId===dlId);}
+
+  return(
+    <div style={{overflowX:"auto",overflowY:"visible"}}>
+      <div style={{minWidth:560}}>
+        {/* Month ticks */}
+        <div style={{display:"flex",marginLeft:LABEL_W,position:"relative",height:22,marginBottom:2}}>
+          {ticks.map((tk,i)=><div key={i} style={{position:"absolute",left:`${tk.p}%`,fontSize:10,color:t.tT,whiteSpace:"nowrap",transform:"translateX(-50%)"}}>{tk.label}</div>)}
+        </div>
+        {/* Rows */}
+        {dated.map((dl,i)=>{
+          const dc=c; // use project colour for all bars
+          const start=dl.startDate?pct(dl.startDate):pct(dl.date);
+          const end=pct(dl.date);
+          const width=Math.max(0.8,end-start);
+          const dts=dlTasks(dl.id);
+          const doneCnt=dts.filter(x=>x.done).length;
+          const pctDone=dts.length>0?doneCnt/dts.length:0;
+          return(
+            <div key={dl.id} style={{display:"flex",alignItems:"center",marginBottom:6,minHeight:ROW_H}}>
+              {/* Label */}
+              <div style={{width:LABEL_W,flexShrink:0,paddingRight:10}}>
+                <div style={{fontSize:12,fontWeight:500,color:dc.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{dl.title}</div>
+                <div style={{fontSize:10,color:t.tT}}>{dts.length} task{dts.length!==1?"s":""}</div>
+              </div>
+              {/* Bar area */}
+              <div style={{flex:1,position:"relative",height:ROW_H,background:t.bg,borderRadius:6,border:`0.5px solid ${t.border}`}}>
+                {/* Today line */}
+                <div style={{position:"absolute",left:`${todayPct}%`,top:0,bottom:0,width:1.5,background:t.todL,opacity:0.6,zIndex:3,pointerEvents:"none"}}/>
+                {/* Bar */}
+                <div style={{position:"absolute",left:`${start}%`,width:`${width}%`,top:8,height:20,borderRadius:6,background:dc.bg,border:`1px solid ${dc.border}`,overflow:"hidden",zIndex:2}}>
+                  {/* Progress fill */}
+                  <div style={{height:"100%",width:`${pctDone*100}%`,background:dc.dot,opacity:0.45,borderRadius:6}}/>
+                </div>
+                {/* Task dots */}
+                {dts.map(tk=>{
+                  // Place dot at the day the task is scheduled, or at deadline date
+                  const dotDate=dl.date;
+                  const dp=pct(dotDate);
+                  return(
+                    <div key={tk.id} title={tk.text} style={{position:"absolute",left:`${dp}%`,top:"50%",transform:"translate(-50%,-50%)",width:8,height:8,borderRadius:"50%",background:tk.done?dc.dot:"#fff",border:`1.5px solid ${dc.dot}`,zIndex:4,cursor:"pointer"}}/>
+                  );
+                })}
+                {/* Due date label */}
+                <div style={{position:"absolute",right:4,top:"50%",transform:"translateY(-50%)",fontSize:9,color:dc.dot,whiteSpace:"nowrap",zIndex:5}}>{fsd(dl.date)}</div>
+              </div>
+            </div>
+          );
+        })}
+        {/* Today legend */}
+        <div style={{display:"flex",alignItems:"center",gap:5,marginTop:6,marginLeft:LABEL_W}}>
+          <div style={{width:12,height:2,background:t.todL,borderRadius:1}}/>
+          <span style={{fontSize:10,color:t.tT}}>Today</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProjectDetail({proj,store,t,theme,DLC,P,onUpdateStore,onDelete}){
+  const c=DLC[proj.colorIdx%DLC.length];
+  const projDls=(Array.isArray(store._deadlines)?store._deadlines:[]).filter(d=>d.projectId===proj.id);
+  const allDates=Object.keys(store).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k));
+  const projTasks=allDates.flatMap(k=>(Array.isArray(store[k])?store[k]:[]).filter(x=>x.projectId===proj.id));
+
+  // Selected task for detail popover
+  const [selTask,setSelTask]=useState(null);
+  // Active tab
+  const [tab,setTab]=useState("overview"); // overview | tasks | deadlines
+
+  // New deadline form
+  const [dlOpen,setDlOpen]=useState(false);
+  const [dlTitle,setDlTitle]=useState("");
+  const [dlStart,setDlStart]=useState("");
+  const [dlDate,setDlDate]=useState("");
+  const [dlDesc,setDlDesc]=useState("");
+  const [dlColor,setDlColor]=useState(proj.colorIdx);
+  // Editing deadline
+  const [editDlId,setEditDlId]=useState(null);
+  const [eDlTitle,setEDlTitle]=useState("");
+  const [eDlStart,setEDlStart]=useState("");
+  const [eDlDate,setEDlDate]=useState("");
+  const [eDlDesc,setEDlDesc]=useState("");
+
+  // New task form
+  const [taskOpen,setTaskOpen]=useState(false);
+  const [taskText,setTaskText]=useState("");
+  const [taskPri,setTaskPri]=useState(null);
+  const [taskDlId,setTaskDlId]=useState(null);
+  const [taskDur,setTaskDur]=useState(2);
+
+  const ins=style=>({width:"100%",fontSize:12,borderRadius:8,border:`0.5px solid ${t.border}`,padding:"7px 10px",background:t.sBg,color:t.tP,outline:"none",boxSizing:"border-box",...style});
+  const lbl=style=>({fontSize:10,color:t.tT,marginBottom:3,marginTop:8,...style});
+
+  function addDeadline(){
+    if(!dlTitle.trim()||!dlDate)return;
+    const nd={id:uid(),title:dlTitle.trim(),date:dlDate,startDate:dlStart||null,desc:dlDesc.trim(),colorIdx:dlColor,projectId:proj.id};
+    onUpdateStore({...store,_deadlines:[...(store._deadlines||[]),nd]});
+    setDlTitle("");setDlStart("");setDlDate("");setDlDesc("");setDlOpen(false);
+  }
+  function saveEditDl(id){
+    if(!eDlTitle.trim()||!eDlDate)return;
+    const updated=(store._deadlines||[]).map(d=>d.id===id?{...d,title:eDlTitle,startDate:eDlStart||null,date:eDlDate,desc:eDlDesc}:d);
+    onUpdateStore({...store,_deadlines:updated});setEditDlId(null);
+  }
+  function removeDl(id){
+    const ns={...store};
+    Object.keys(ns).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).forEach(k=>{ns[k]=(ns[k]||[]).map(x=>x.deadlineId===id?{...x,deadlineId:null}:x);});
+    ns._deadlines=(ns._deadlines||[]).filter(x=>x.id!==id);
+    onUpdateStore(ns);
+  }
+  function addTask(){
+    if(!taskText.trim())return;
+    const today=new Date();const dateKey=today.getFullYear()+"-"+String(today.getMonth()+1).padStart(2,"0")+"-"+String(today.getDate()).padStart(2,"0");
+    const nt={id:uid(),text:taskText.trim(),priority:taskPri,dur:taskDur,slot:null,done:false,deadlineId:taskDlId||null,projectId:proj.id,note:"",colorId:null};
+    onUpdateStore({...store,[dateKey]:[...(store[dateKey]||[]),nt]});
+    setTaskText("");setTaskPri(null);setTaskDlId(null);setTaskOpen(false);
+  }
+  function toggleTask(dateKey,id){
+    onUpdateStore({...store,[dateKey]:(store[dateKey]||[]).map(x=>x.id===id?{...x,done:!x.done}:x)});
+  }
+  function removeTask(dateKey,id){
+    onUpdateStore({...store,[dateKey]:(store[dateKey]||[]).filter(x=>x.id!==id)});
+  }
+
+  const totalT=projTasks.length,doneT=projTasks.filter(x=>x.done).length;
+  const pct=totalT>0?Math.round(doneT/totalT*100):0;
+
+  const Tab=({id,label})=>(
+    <button onClick={()=>setTab(id)} style={{fontSize:12,padding:"5px 14px",borderRadius:20,border:`0.5px solid ${tab===id?c.border:t.border}`,background:tab===id?c.bg:"transparent",color:tab===id?c.text:t.tS,cursor:"pointer",fontWeight:tab===id?500:400}}>{label}</button>
+  );
+
+  return(
+    <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0,overflow:"hidden"}}>
+      {/* Project header */}
+      <div style={{padding:"20px 24px 16px",borderBottom:`0.5px solid ${t.border}`,flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:12}}>
+          <div style={{width:14,height:14,borderRadius:"50%",background:c.dot,flexShrink:0,marginTop:3}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:20,fontWeight:600,color:t.tP,marginBottom:proj.desc?4:0,lineHeight:1.2}}>{proj.name}</div>
+            {proj.desc&&<div style={{fontSize:13,color:t.tS,lineHeight:1.5}}>{proj.desc}</div>}
+          </div>
+          <button onClick={onDelete} style={{fontSize:11,color:"#E24B4A",background:"none",border:"0.5px solid #E24B4A44",borderRadius:7,padding:"4px 12px",cursor:"pointer",flexShrink:0,marginTop:2}}>Delete project</button>
+        </div>
+        {/* Progress bar */}
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{flex:1,height:6,borderRadius:6,background:t.border,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${pct}%`,background:c.dot,borderRadius:6,transition:"width 0.4s ease"}}/>
+          </div>
+          <span style={{fontSize:12,color:c.dot,fontWeight:500,flexShrink:0}}>{doneT}/{totalT} tasks · {pct}%</span>
+        </div>
+        {/* Stats row */}
+        <div style={{display:"flex",gap:8,marginTop:12}}>
+          {[{l:"Deadlines",v:projDls.length},{l:"Total tasks",v:totalT},{l:"Done",v:doneT},{l:"Remaining",v:totalT-doneT}].map(s=>(
+            <div key={s.l} style={{flex:1,background:t.bg,border:`0.5px solid ${t.border}`,borderRadius:8,padding:"6px 10px",textAlign:"center"}}>
+              <div style={{fontSize:15,fontWeight:600,color:t.tP}}>{s.v}</div>
+              <div style={{fontSize:10,color:t.tT,marginTop:1}}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Tabs */}
+      <div style={{padding:"12px 24px 0",borderBottom:`0.5px solid ${t.border}`,display:"flex",gap:6,flexShrink:0}}>
+        <Tab id="overview" label="Timeline"/><Tab id="tasks" label="Tasks"/><Tab id="deadlines" label="Deadlines"/>
+      </div>
+      {/* Content */}
+      <div style={{flex:1,overflowY:"auto",padding:"20px 24px"}}>
+
+        {/* ── TIMELINE TAB ── */}
+        {tab==="overview"&&(
+          <div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:500,color:t.tP}}>Gantt timeline</div>
+              <button onClick={()=>{setTab("deadlines");setDlOpen(true);}} style={{fontSize:11,padding:"4px 12px",borderRadius:7,border:`0.5px solid ${c.border}`,background:c.bg,color:c.text,cursor:"pointer"}}>+ Add deadline</button>
+            </div>
+            <GanttChart deadlines={projDls} tasks={projTasks} c={c} t={t}/>
+            {projDls.length>0&&projTasks.length>0&&(
+              <div style={{marginTop:20}}>
+                <div style={{fontSize:10,fontWeight:500,color:t.tT,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:10}}>Task breakdown</div>
+                {projDls.map(dl=>{
+                  const dlT=projTasks.filter(x=>x.deadlineId===dl.id);
+                  if(!dlT.length)return null;
+                  const dc2=DLC[dl.colorIdx%DLC.length];
+                  const days=du(dl.date);
+                  return(
+                    <div key={dl.id} style={{marginBottom:14}}>
+                      <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
+                        <span style={{width:8,height:8,borderRadius:"50%",background:dc2.dot,display:"inline-block",flexShrink:0}}/>
+                        <span style={{fontSize:12,fontWeight:500,color:dc2.text}}>{dl.title}</span>
+                        <span style={{fontSize:11,color:days<0?"#E24B4A":days<=3?"#C07010":t.tT,marginLeft:"auto"}}>{days===null?"no date":days<0?`${Math.abs(days)}d overdue`:days===0?"due today":days===1?"due tomorrow":`${days}d left`}</span>
+                      </div>
+                      {dlT.map(tk=>(
+                        <div key={tk.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 10px",borderRadius:7,background:tk.done?t.bg:dc2.bg+"55",border:`0.5px solid ${t.border}`,marginBottom:4,cursor:"pointer"}} onClick={()=>setSelTask(selTask?.id===tk.id?null:tk)}>
+                          <span style={{width:6,height:6,borderRadius:"50%",background:P[tk.priority||"none"].dot,flexShrink:0}}/>
+                          <span style={{flex:1,fontSize:12,color:tk.done?t.tT:t.tP,textDecoration:tk.done?"line-through":"none"}}>{tk.text}</span>
+                          <PriorityTag priority={tk.priority} P={P}/>
+                          <span style={{fontSize:10,color:t.tT}}>{tk.dur*15}m</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TASKS TAB ── */}
+        {tab==="tasks"&&(
+          <div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:500,color:t.tP}}>{projTasks.length} task{projTasks.length!==1?"s":""}</div>
+              <button onClick={()=>setTaskOpen(v=>!v)} style={{fontSize:11,padding:"4px 12px",borderRadius:7,border:`0.5px solid ${c.border}`,background:taskOpen?c.bg:"transparent",color:c.text,cursor:"pointer"}}>+ Add task</button>
+            </div>
+            {taskOpen&&(
+              <div style={{background:t.bg,border:`0.5px solid ${t.border}`,borderRadius:12,padding:16,marginBottom:16}}>
+                <div style={lbl({marginTop:0})}>Task name</div>
+                <input value={taskText} onChange={e=>setTaskText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addTask()} placeholder="What needs to be done?" style={ins({marginBottom:2})}/>
+                <div style={{display:"flex",gap:8,marginTop:10}}>
+                  <div style={{flex:1}}>
+                    <div style={lbl({marginTop:0})}>Priority</div>
+                    <select value={taskPri||""} onChange={e=>setTaskPri(e.target.value||null)} style={ins({})}>
+                      <option value="">None</option>
+                      {["high","medium","low"].map(p=><option key={p} value={p}>{p.charAt(0).toUpperCase()+p.slice(1)}</option>)}
+                    </select>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={lbl({marginTop:0})}>Duration</div>
+                    <select value={taskDur} onChange={e=>setTaskDur(Number(e.target.value))} style={ins({})}>
+                      {[1,2,3,4,6,8].map(s=><option key={s} value={s}>{s*15} min</option>)}
+                    </select>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={lbl({marginTop:0})}>Deadline</div>
+                    <select value={taskDlId||""} onChange={e=>setTaskDlId(e.target.value||null)} style={ins({})}>
+                      <option value="">None</option>
+                      {projDls.map(d=><option key={d.id} value={d.id}>{d.title}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:8,marginTop:12}}>
+                  <button onClick={addTask} style={{flex:1,background:t.aBtn,border:"none",borderRadius:8,padding:"8px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Add task</button>
+                  <button onClick={()=>setTaskOpen(false)} style={{flex:1,background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:8,padding:"8px 0",cursor:"pointer",color:t.tS,fontSize:12}}>Cancel</button>
+                </div>
+              </div>
+            )}
+            {projTasks.length===0&&!taskOpen&&<div style={{fontSize:12,color:t.tT,textAlign:"center",padding:"30px 0"}}>No tasks yet. Add one above.</div>}
+            {/* Group by deadline */}
+            {projDls.map(dl=>{
+              const dlT=projTasks.filter(x=>x.deadlineId===dl.id);
+              if(!dlT.length)return null;
+              const dc2=DLC[dl.colorIdx%DLC.length];
+              return(
+                <div key={dl.id} style={{marginBottom:16}}>
+                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
+                    <span style={{width:8,height:8,borderRadius:"50%",background:dc2.dot,display:"inline-block"}}/>
+                    <span style={{fontSize:12,fontWeight:500,color:dc2.text}}>{dl.title}</span>
+                    <span style={{fontSize:10,color:t.tT}}>{fsd(dl.date)}</span>
+                  </div>
+                  {dlT.map(tk=>{
+                    const dateKey=allDates.find(d=>(store[d]||[]).some(x=>x.id===tk.id));
+                    return(
+                      <div key={tk.id}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,background:t.bg,border:`0.5px solid ${selTask?.id===tk.id?c.border:t.border}`,marginBottom:4,cursor:"pointer"}} onClick={()=>setSelTask(selTask?.id===tk.id?null:tk)}>
+                          <input type="checkbox" checked={tk.done} onChange={e=>{e.stopPropagation();if(dateKey)toggleTask(dateKey,tk.id);}} style={{width:13,height:13,flexShrink:0,cursor:"pointer"}}/>
+                          <span style={{flex:1,fontSize:12,color:tk.done?t.tT:t.tP,textDecoration:tk.done?"line-through":"none"}}>{tk.text}</span>
+                          <PriorityTag priority={tk.priority} P={P}/>
+                          <span style={{fontSize:10,color:t.tT}}>{tk.dur*15}m</span>
+                          <button onClick={e=>{e.stopPropagation();if(dateKey)removeTask(dateKey,tk.id);}} style={{background:"none",border:"none",color:"#E24B4A",cursor:"pointer",fontSize:14,padding:0,lineHeight:1}}>×</button>
+                        </div>
+                        {selTask?.id===tk.id&&(
+                          <div style={{background:c.bg+"88",border:`0.5px solid ${c.border}`,borderRadius:8,padding:"10px 12px",marginBottom:8,marginTop:-2}}>
+                            <div style={{fontSize:12,fontWeight:500,color:c.text,marginBottom:6}}>{tk.text}</div>
+                            <div style={{display:"flex",gap:12,fontSize:11,color:t.tS,flexWrap:"wrap"}}>
+                              <span>Priority: <strong>{tk.priority||"none"}</strong></span>
+                              <span>Duration: <strong>{tk.dur*15}m</strong></span>
+                              <span>Status: <strong style={{color:tk.done?t.acc:t.tP}}>{tk.done?"Done":"To do"}</strong></span>
+                              {tk.slot!=null&&<span>Scheduled: <strong>{s2t(tk.slot)}</strong></span>}
+                            </div>
+                            {tk.note&&<div style={{fontSize:11,color:t.tS,marginTop:8,padding:"6px 8px",background:t.sBg,borderRadius:6,lineHeight:1.6}}>{tk.note}</div>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            {/* Unlinked tasks */}
+            {(()=>{const unlinked=projTasks.filter(x=>!x.deadlineId||!projDls.find(d=>d.id===x.deadlineId));if(!unlinked.length)return null;return(
+              <div style={{marginBottom:16}}>
+                <div style={{fontSize:11,color:t.tT,fontWeight:500,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:8}}>No deadline</div>
+                {unlinked.map(tk=>{
+                  const dateKey=allDates.find(d=>(store[d]||[]).some(x=>x.id===tk.id));
+                  return(
+                    <div key={tk.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",borderRadius:8,background:t.bg,border:`0.5px solid ${t.border}`,marginBottom:4}}>
+                      <input type="checkbox" checked={tk.done} onChange={()=>{if(dateKey)toggleTask(dateKey,tk.id);}} style={{width:13,height:13,flexShrink:0,cursor:"pointer"}}/>
+                      <span style={{flex:1,fontSize:12,color:tk.done?t.tT:t.tP,textDecoration:tk.done?"line-through":"none"}}>{tk.text}</span>
+                      <PriorityTag priority={tk.priority} P={P}/>
+                      <button onClick={()=>{if(dateKey)removeTask(dateKey,tk.id);}} style={{background:"none",border:"none",color:"#E24B4A",cursor:"pointer",fontSize:14,padding:0,lineHeight:1}}>×</button>
+                    </div>
+                  );
+                })}
+              </div>
+            );})()}
+          </div>
+        )}
+
+        {/* ── DEADLINES TAB ── */}
+        {tab==="deadlines"&&(
+          <div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+              <div style={{fontSize:13,fontWeight:500,color:t.tP}}>{projDls.length} deadline{projDls.length!==1?"s":""}</div>
+              <button onClick={()=>setDlOpen(v=>!v)} style={{fontSize:11,padding:"4px 12px",borderRadius:7,border:`0.5px solid ${c.border}`,background:dlOpen?c.bg:"transparent",color:c.text,cursor:"pointer"}}>+ Add deadline</button>
+            </div>
+            {dlOpen&&(
+              <div style={{background:t.bg,border:`0.5px solid ${t.border}`,borderRadius:12,padding:16,marginBottom:16}}>
+                <div style={lbl({marginTop:0})}>Title</div>
+                <input value={dlTitle} onChange={e=>setDlTitle(e.target.value)} placeholder="Deadline title" style={ins({})}/>
+                <div style={{display:"flex",gap:8,marginTop:10}}>
+                  <div style={{flex:1}}><div style={lbl({marginTop:0})}>Start date (optional)</div><input type="date" value={dlStart} onChange={e=>setDlStart(e.target.value)} style={ins({})}/></div>
+                  <div style={{flex:1}}><div style={lbl({marginTop:0})}>Due date</div><input type="date" value={dlDate} onChange={e=>setDlDate(e.target.value)} style={ins({})}/></div>
+                </div>
+                <div style={lbl()}>Description (optional)</div>
+                <input value={dlDesc} onChange={e=>setDlDesc(e.target.value)} placeholder="Notes about this deadline" style={ins({})}/>
+                <div style={lbl()}>Colour</div>
+                <select value={dlColor} onChange={e=>setDlColor(Number(e.target.value))} style={{...ins({}),background:DLC[dlColor].bg,color:DLC[dlColor].text,border:`0.5px solid ${DLC[dlColor].border}`}}>
+                  {DLC.map((_,i)=><option key={i} value={i}>{DL_NAMES[i]}</option>)}
+                </select>
+                <div style={{display:"flex",gap:8,marginTop:12}}>
+                  <button onClick={addDeadline} style={{flex:1,background:t.aBtn,border:"none",borderRadius:8,padding:"8px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Add deadline</button>
+                  <button onClick={()=>setDlOpen(false)} style={{flex:1,background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:8,padding:"8px 0",cursor:"pointer",color:t.tS,fontSize:12}}>Cancel</button>
+                </div>
+              </div>
+            )}
+            {projDls.length===0&&!dlOpen&&<div style={{fontSize:12,color:t.tT,textAlign:"center",padding:"30px 0"}}>No deadlines yet. Add one above.</div>}
+            {[...projDls].sort((a,b)=>a.date.localeCompare(b.date)).map(dl=>{
+              const dc2=DLC[dl.colorIdx%DLC.length];
+              const dlT=projTasks.filter(x=>x.deadlineId===dl.id);
+              const doneT2=dlT.filter(x=>x.done).length;
+              const days=du(dl.date);
+              const isEd=editDlId===dl.id;
+              return(
+                <div key={dl.id} style={{background:dc2.bg+"99",border:`0.5px solid ${dc2.border}`,borderRadius:12,padding:"14px 16px",marginBottom:10}}>
+                  {isEd?(
+                    <div>
+                      <input value={eDlTitle} onChange={e=>setEDlTitle(e.target.value)} style={ins({marginBottom:8})}/>
+                      <div style={{display:"flex",gap:8,marginBottom:8}}>
+                        <div style={{flex:1}}><div style={lbl({marginTop:0})}>Start</div><input type="date" value={eDlStart} onChange={e=>setEDlStart(e.target.value)} style={ins({})}/></div>
+                        <div style={{flex:1}}><div style={lbl({marginTop:0})}>Due</div><input type="date" value={eDlDate} onChange={e=>setEDlDate(e.target.value)} style={ins({})}/></div>
+                      </div>
+                      <input value={eDlDesc} onChange={e=>setEDlDesc(e.target.value)} placeholder="Description" style={ins({marginBottom:10})}/>
+                      <div style={{display:"flex",gap:6}}>
+                        <button onClick={()=>saveEditDl(dl.id)} style={{flex:1,background:t.aBtn,border:"none",borderRadius:7,padding:"6px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Save</button>
+                        <button onClick={()=>setEditDlId(null)} style={{flex:1,background:"transparent",border:`0.5px solid ${dc2.border}`,borderRadius:7,padding:"6px 0",cursor:"pointer",color:dc2.text,fontSize:12}}>Cancel</button>
+                      </div>
+                    </div>
+                  ):(
+                    <>
+                      <div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:8}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:14,fontWeight:600,color:dc2.text,marginBottom:2}}>{dl.title}</div>
+                          {dl.desc&&<div style={{fontSize:12,color:dc2.text,opacity:0.75,marginBottom:4}}>{dl.desc}</div>}
+                          <div style={{display:"flex",gap:12,fontSize:11,color:dc2.dot,flexWrap:"wrap"}}>
+                            {dl.startDate&&<span>Start: {fsd(dl.startDate)}</span>}
+                            <span>Due: {fsd(dl.date)}</span>
+                            <span style={{color:days<0?"#E24B4A":days<=3?"#C07010":dc2.dot,fontWeight:500}}>{days===null?"":days<0?`${Math.abs(days)}d overdue`:days===0?"Due today":days===1?"Due tomorrow":`${days}d left`}</span>
+                          </div>
+                        </div>
+                        <div style={{display:"flex",gap:6,flexShrink:0}}>
+                          <button onClick={()=>{setEditDlId(dl.id);setEDlTitle(dl.title);setEDlStart(dl.startDate||"");setEDlDate(dl.date);setEDlDesc(dl.desc||"");}} style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:`0.5px solid ${dc2.border}`,background:"transparent",color:dc2.text,cursor:"pointer"}}>Edit</button>
+                          <button onClick={()=>removeDl(dl.id)} style={{fontSize:11,padding:"3px 10px",borderRadius:6,border:"0.5px solid #E24B4A44",background:"transparent",color:"#E24B4A",cursor:"pointer"}}>Remove</button>
+                        </div>
+                      </div>
+                      {/* Progress */}
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:dlT.length?10:0}}>
+                        <div style={{flex:1,height:4,borderRadius:4,background:dc2.border+"44",overflow:"hidden"}}><div style={{height:"100%",width:`${dlT.length>0?Math.round(doneT2/dlT.length*100):0}%`,background:dc2.dot,borderRadius:4}}/></div>
+                        <span style={{fontSize:11,color:dc2.dot,whiteSpace:"nowrap"}}>{doneT2}/{dlT.length} done</span>
+                      </div>
+                      {dlT.map(tk=><div key={tk.id} style={{display:"flex",alignItems:"center",gap:7,fontSize:11,padding:"3px 4px"}}><span style={{display:"inline-block",width:5,height:5,borderRadius:"50%",background:P[tk.priority||"none"].dot,flexShrink:0}}/><span style={{flex:1,color:tk.done?t.tT:dc2.text,textDecoration:tk.done?"line-through":"none"}}>{tk.text}</span></div>)}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProjectsOverlay({store,t,theme,DLC,P,onClose,onUpdateStore}){
   const projects=Array.isArray(store._projects)?store._projects:[];
+  const [sel,setSel]=useState(projects.length>0?projects[0].id:null);
   const [newName,setNewName]=useState("");
   const [newDesc,setNewDesc]=useState("");
   const [newColor,setNewColor]=useState(0);
-  const [sel,setSel]=useState(null);
-  const NAMES=["Amber","Rose","Teal","Coral","Stone","Sage"];
+  const [addOpen,setAddOpen]=useState(false);
 
-  function addProject(){if(!newName.trim())return;const np={id:uid(),name:newName.trim(),desc:newDesc.trim(),colorIdx:newColor};onUpdateStore({...store,_projects:[...projects,np]});setNewName("");setNewDesc("");setNewColor(0);}
-  function removeProject(id){onUpdateStore({...store,_projects:projects.filter(p=>p.id!==id)});}
+  function addProject(){
+    if(!newName.trim())return;
+    const np={id:uid(),name:newName.trim(),desc:newDesc.trim(),colorIdx:newColor};
+    onUpdateStore({...store,_projects:[...projects,np]});
+    setNewName("");setNewDesc("");setNewColor(0);setAddOpen(false);
+    setSel(np.id);
+  }
+  function deleteProject(id){
+    const ns={...store};
+    // Remove projectId from all tasks
+    Object.keys(ns).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).forEach(k=>{ns[k]=(ns[k]||[]).map(x=>x.projectId===id?{...x,projectId:null}:x);});
+    // Remove deadlines belonging to project
+    const dlIds=new Set((ns._deadlines||[]).filter(d=>d.projectId===id).map(d=>d.id));
+    Object.keys(ns).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k)).forEach(k=>{ns[k]=(ns[k]||[]).map(x=>dlIds.has(x.deadlineId)?{...x,deadlineId:null}:x);});
+    ns._deadlines=(ns._deadlines||[]).filter(d=>d.projectId!==id);
+    ns._projects=(ns._projects||[]).filter(p=>p.id!==id);
+    onUpdateStore(ns);
+    setSel(projects.filter(p=>p.id!==id)[0]?.id||null);
+  }
 
   const selP=sel?projects.find(p=>p.id===sel):null;
-  const selC=selP?DLC[selP.colorIdx%DLC.length]:null;
-  const allDates=Object.keys(store).filter(k=>/^\d{4}-\d{2}-\d{2}$/.test(k));
-  const projTasks=selP?allDates.flatMap(k=>(Array.isArray(store[k])?store[k]:[]).filter(t=>t.projectId===selP.id)):[];
 
   return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div style={{background:t.cBg,borderRadius:18,width:680,maxWidth:"94vw",maxHeight:"80vh",display:"flex",overflow:"hidden",boxShadow:"0 20px 60px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
-        {/* Sidebar */}
-        <div style={{width:220,flexShrink:0,borderRight:`0.5px solid ${t.border}`,padding:"20px 16px",display:"flex",flexDirection:"column",gap:0,overflowY:"auto"}}>
-          <div style={{fontWeight:500,fontSize:14,color:t.tP,marginBottom:16}}>Projects</div>
-          {projects.length===0&&<div style={{fontSize:12,color:t.tT,marginBottom:12}}>No projects yet.</div>}
-          {projects.map(p=>{const c=DLC[p.colorIdx%DLC.length];return(<button key={p.id} onClick={()=>setSel(sel===p.id?null:p.id)} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:9,border:`0.5px solid ${sel===p.id?c.border:t.border}`,background:sel===p.id?c.bg:"transparent",cursor:"pointer",marginBottom:5,textAlign:"left",width:"100%"}}>
-            <span style={{width:8,height:8,borderRadius:"50%",background:c.dot,flexShrink:0,display:"inline-block"}}/>
-            <div style={{flex:1,minWidth:0}}><div style={{fontSize:12,fontWeight:500,color:sel===p.id?c.text:t.tP,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>{p.desc&&<div style={{fontSize:10,color:t.tT,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.desc}</div>}</div>
-          </button>);})}
-          <div style={{borderTop:`0.5px solid ${t.hr}`,paddingTop:12,marginTop:8}}>
-            <div style={{fontSize:10,color:t.tT,letterSpacing:"0.06em",textTransform:"uppercase",marginBottom:8}}>New project</div>
-            <input value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addProject()} placeholder="Project name" style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 8px",background:t.sBg,color:t.tP,marginBottom:5,boxSizing:"border-box",outline:"none"}}/>
-            <input value={newDesc} onChange={e=>setNewDesc(e.target.value)} placeholder="Description (optional)" style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"5px 8px",background:t.sBg,color:t.tP,marginBottom:7,boxSizing:"border-box",outline:"none"}}/>
-            <select value={newColor} onChange={e=>setNewColor(Number(e.target.value))} style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${DLC[newColor].border}`,padding:"5px 8px",background:DLC[newColor].bg,color:DLC[newColor].text,marginBottom:8,outline:"none"}}>
-              {DLC.map((_,i)=><option key={i} value={i}>{NAMES[i]}</option>)}
-            </select>
-            <button onClick={addProject} style={{width:"100%",background:t.aBtn,border:"none",borderRadius:7,padding:"6px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Add project</button>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={{background:t.cBg,borderRadius:20,width:"min(1100px,96vw)",height:"min(780px,88vh)",display:"flex",overflow:"hidden",boxShadow:"0 24px 80px rgba(0,0,0,0.3)"}} onClick={e=>e.stopPropagation()}>
+        {/* ── Sidebar ── */}
+        <div style={{width:230,flexShrink:0,borderRight:`0.5px solid ${t.border}`,display:"flex",flexDirection:"column",background:t.bg}}>
+          {/* Header */}
+          <div style={{padding:"20px 18px 14px",borderBottom:`0.5px solid ${t.border}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <span style={{fontSize:14,fontWeight:600,color:t.tP}}>Projects</span>
+            <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:t.tT,fontSize:20,lineHeight:1,padding:0}}>×</button>
           </div>
-        </div>
-        {/* Detail */}
-        <div style={{flex:1,padding:"20px 20px",overflowY:"auto"}}>
-          <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
-            <button onClick={onClose} style={{background:"none",border:"none",cursor:"pointer",color:t.tT,fontSize:20,lineHeight:1}}>×</button>
+          {/* Project list */}
+          <div style={{flex:1,overflowY:"auto",padding:"10px 10px 0"}}>
+            {projects.length===0&&<div style={{fontSize:12,color:t.tT,textAlign:"center",padding:"24px 8px"}}>No projects yet.</div>}
+            {projects.map(p=>{const c=DLC[p.colorIdx%DLC.length];const active=sel===p.id;return(
+              <button key={p.id} onClick={()=>setSel(p.id)} style={{display:"flex",alignItems:"center",gap:9,padding:"9px 10px",borderRadius:10,border:`0.5px solid ${active?c.border:"transparent"}`,background:active?c.bg+"CC":"transparent",cursor:"pointer",marginBottom:3,textAlign:"left",width:"100%",transition:"all 0.15s"}}>
+                <span style={{width:9,height:9,borderRadius:"50%",background:c.dot,flexShrink:0}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:active?600:400,color:active?c.text:t.tP,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
+                  {p.desc&&<div style={{fontSize:10,color:t.tT,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:1}}>{p.desc}</div>}
+                </div>
+              </button>
+            );})}
           </div>
-          {!selP?(<div style={{textAlign:"center",padding:"40px 0",color:t.tT,fontSize:13}}>Select a project to see details</div>):(
-            <div>
-              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
-                <span style={{width:12,height:12,borderRadius:"50%",background:selC.dot,display:"inline-block"}}/>
-                <div style={{fontSize:18,fontWeight:500,color:selP?selC.text:t.tP}}>{selP.name}</div>
-                <button onClick={()=>{removeProject(selP.id);setSel(null);}} style={{marginLeft:"auto",fontSize:11,color:"#E24B4A",background:"none",border:"0.5px solid #E24B4A",borderRadius:6,padding:"3px 10px",cursor:"pointer"}}>Remove</button>
+          {/* Add project */}
+          <div style={{padding:"10px",borderTop:`0.5px solid ${t.border}`}}>
+            {addOpen?(
+              <div>
+                <input value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addProject()} placeholder="Project name" style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"6px 8px",background:t.sBg,color:t.tP,marginBottom:5,boxSizing:"border-box",outline:"none"}}/>
+                <input value={newDesc} onChange={e=>setNewDesc(e.target.value)} placeholder="Description (optional)" style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${t.border}`,padding:"6px 8px",background:t.sBg,color:t.tP,marginBottom:5,boxSizing:"border-box",outline:"none"}}/>
+                <select value={newColor} onChange={e=>setNewColor(Number(e.target.value))} style={{width:"100%",fontSize:12,borderRadius:7,border:`0.5px solid ${DLC[newColor].border}`,padding:"5px 8px",background:DLC[newColor].bg,color:DLC[newColor].text,marginBottom:8,outline:"none"}}>
+                  {DLC.map((_,i)=><option key={i} value={i}>{DL_NAMES[i]}</option>)}
+                </select>
+                <div style={{display:"flex",gap:5}}>
+                  <button onClick={addProject} style={{flex:1,background:t.aBtn,border:"none",borderRadius:7,padding:"6px 0",cursor:"pointer",color:t.aBtnTx,fontSize:12,fontWeight:500}}>Add</button>
+                  <button onClick={()=>setAddOpen(false)} style={{flex:1,background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:7,padding:"6px 0",cursor:"pointer",color:t.tS,fontSize:12}}>Cancel</button>
+                </div>
               </div>
-              {selP.desc&&<div style={{fontSize:13,color:t.tS,marginBottom:16}}>{selP.desc}</div>}
-              <div style={{fontSize:10,fontWeight:500,color:t.tT,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>Tasks in this project</div>
-              {projTasks.length===0?(<div style={{fontSize:12,color:t.tT}}>No tasks linked to this project yet.</div>):(projTasks.map(t2=><div key={t2.id} style={{display:"flex",alignItems:"center",gap:8,fontSize:12,padding:"4px 0",borderBottom:`0.5px solid ${t.hr}`}}><span style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:P[t2.priority||"none"].dot,flexShrink:0}}/><span style={{flex:1,color:t2.done?t.tT:t.tP,textDecoration:t2.done?"line-through":"none"}}>{t2.text}</span><PriorityTag priority={t2.priority} P={P}/></div>))}
-            </div>
-          )}
+            ):(
+              <button onClick={()=>setAddOpen(true)} style={{width:"100%",background:"transparent",border:`0.5px solid ${t.border}`,borderRadius:9,padding:"7px 0",cursor:"pointer",color:t.tS,fontSize:12,display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+                <span style={{fontSize:15,lineHeight:1}}>+</span> New project
+              </button>
+            )}
+          </div>
         </div>
+        {/* ── Main area ── */}
+        {!selP?(
+          <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,color:t.tT}}>
+            <div style={{fontSize:32,opacity:0.3}}>📋</div>
+            <div style={{fontSize:13}}>Select or create a project</div>
+          </div>
+        ):(
+          <ProjectDetail key={selP.id} proj={selP} store={store} t={t} theme={theme} DLC={DLC} P={P} onUpdateStore={onUpdateStore} onDelete={()=>deleteProject(selP.id)}/>
+        )}
       </div>
     </div>
   );
