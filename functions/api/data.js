@@ -1,10 +1,20 @@
+function b64url(str) {
+  return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+function fromb64url(str) {
+  return str.replace(/-/g, '+').replace(/_/g, '/');
+}
+
 async function verifyToken(token, secret) {
   const enc = new TextEncoder();
-  const [header, body, sig] = token.split('.');
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  const [header, body, sig] = parts;
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), {name:'HMAC',hash:'SHA-256'}, false, ['verify']);
-  const valid = await crypto.subtle.verify('HMAC', key, Uint8Array.from(atob(sig), c=>c.charCodeAt(0)), enc.encode(`${header}.${body}`));
+  const sigBytes = Uint8Array.from(atob(fromb64url(sig)), c => c.charCodeAt(0));
+  const valid = await crypto.subtle.verify('HMAC', key, sigBytes, enc.encode(`${header}.${body}`));
   if (!valid) return null;
-  const payload = JSON.parse(atob(body));
+  const payload = JSON.parse(atob(fromb64url(body)));
   if (payload.exp < Math.floor(Date.now()/1000)) return null;
   return payload;
 }
