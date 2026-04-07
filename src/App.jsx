@@ -591,11 +591,11 @@ function MainApp({onLogout}){
 
   function getSlot(e){if(!calScrollRef.current)return 0;const rect=calScrollRef.current.getBoundingClientRect();const scrollTop=calScrollRef.current.scrollTop;const y=e.clientY-rect.top+scrollTop;return Math.max(0,Math.min(Math.floor(y/SLOT_H),TOT_SLOTS-1));}
   function onDragStart(e,task){dragInfo.current=task;e.dataTransfer.effectAllowed="move";const tc=getTaskColor(task,deadlines,DLC,theme);const el=document.createElement("div");el.style.cssText=`position:absolute;top:-999px;padding:5px 10px;background:${tc.bg};border:1px solid ${tc.border};border-radius:8px;font-size:12px;color:${tc.text};white-space:nowrap;`;el.textContent=task.text;document.body.appendChild(el);e.dataTransfer.setDragImage(el,0,0);setTimeout(()=>document.body.removeChild(el),0);}
-  const onDragOver=useCallback(e=>{e.preventDefault();if(!dragInfo.current)return;setGhost({slot:getSlot(e),dur:dragInfo.current.dur,priority:dragInfo.current.priority,type:dragInfo.current.type,deadlineId:dragInfo.current.deadlineId});},[]);
-  const onDrop=useCallback(e=>{e.preventDefault();if(!dragInfo.current)return;const slot=getSlot(e),id=dragInfo.current.id;setTasks(x=>x.map(v=>v.id===id?{...v,slot}:v));setGhost(null);dragInfo.current=null;},[key,store]);
-  const onDragLeave=useCallback(e=>{if(!calScrollRef.current?.contains(e.relatedTarget))setGhost(null);},[]);
-  const onDragEnd2=useCallback(()=>{setGhost(null);dragInfo.current=null;},[]);
-  const onDropUnschedule=useCallback(e=>{e.preventDefault();if(!dragInfo.current)return;const id=dragInfo.current.id;setTasks(x=>x.map(v=>v.id===id?{...v,slot:null}:v));setGhost(null);dragInfo.current=null;},[key,store]);
+  function onDragOver(e){e.preventDefault();if(!dragInfo.current)return;setGhost({slot:getSlot(e),dur:dragInfo.current.dur,priority:dragInfo.current.priority,type:dragInfo.current.type,deadlineId:dragInfo.current.deadlineId});}
+  function onDrop(e){e.preventDefault();if(!dragInfo.current)return;const slot=getSlot(e),id=dragInfo.current.id;setTasks(x=>x.map(v=>v.id===id?{...v,slot}:v));setGhost(null);dragInfo.current=null;}
+  function onDragLeave(e){if(!calScrollRef.current?.contains(e.relatedTarget))setGhost(null);}
+  function onDragEnd2(){setGhost(null);dragInfo.current=null;}
+  function onDropUnschedule(e){e.preventDefault();if(!dragInfo.current)return;const id=dragInfo.current.id;setTasks(x=>x.map(v=>v.id===id?{...v,slot:null}:v));setGhost(null);dragInfo.current=null;}
   function onResize(e,task){e.preventDefault();e.stopPropagation();const sy=e.clientY,sd2=task.dur;function mv(ev){const dy=ev.clientY-sy,nd=Math.max(1,sd2+Math.round(dy/SLOT_H));setTasks(x=>x.map(v=>v.id===task.id?{...v,dur:nd}:v));}function up(){document.removeEventListener("mousemove",mv);document.removeEventListener("mouseup",up);}document.addEventListener("mousemove",mv);document.addEventListener("mouseup",up);}
 
   const cLayout=computeCols(sched);
