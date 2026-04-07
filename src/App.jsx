@@ -1332,7 +1332,7 @@ function MainApp({onLogout}){
     );
   }
 
-  function TaskListCard({dropProps}){
+  function TaskListCard(){
     return(
       <div className="col-scroll" onDragOver={e=>{e.preventDefault();setOverUnsch(true);}} onDragLeave={()=>setOverUnsch(false)} onDrop={e=>{setOverUnsch(false);onDropUnschedule(e);}} style={{background:t.cBg,border:`0.5px solid ${overUnsch?t.acc:t.border}`,borderRadius:14,padding:"14px 16px",overflowY:"auto",maxHeight:isNarrow?"none":"calc(100vh - 280px)"}}>
         {DeadlineSections()}
