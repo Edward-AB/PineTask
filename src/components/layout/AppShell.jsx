@@ -35,7 +35,7 @@ export default function AppShell({ children }) {
   const bodyStyle = {
     display: 'flex',
     flex: 1,
-    paddingTop: 52, // header height
+    paddingTop: 48, // header height
   };
 
   const mainStyle = {
