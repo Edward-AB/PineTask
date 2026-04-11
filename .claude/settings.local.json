@@ -27,7 +27,13 @@
       "Bash(pip3 install:*)",
       "Bash(unzip -l /var/folders/_q/fnr3yp4j4xg4xs9kv4gcpvmw0000gn/T/com.anthropic.claudefordesktop/zip_cache/C925DCC6-BE9C-42A0-95D3-EAF0858550F1-34894-000008657C2B0EFD)",
       "Bash(npx vite:*)",
-      "Bash(rm -f /Users/edward/pinetask/.git/index.lock)"
+      "Bash(rm -f /Users/edward/pinetask/.git/index.lock)",
+      "Bash(ls /Users/edward/pinetask/*.png /Users/edward/pinetask/icon*)",
+      "Bash(ls /Users/edward/pinetask/public/favicon*)",
+      "Bash(ls /Users/edward/pinetask/src/assets/favicon*)",
+      "Bash(cp \"/Users/edward/Desktop/ALL/PineTask/Logos/dark icon.png\" /tmp/pinetask-icon.png)",
+      "Bash(sips -z 32 32 /tmp/pinetask-icon.png -o /Users/edward/pinetask/favicon.png)",
+      "Bash(sips -z 180 180 \"/Users/edward/Desktop/ALL/PineTask/Logos/dark icon.png\" -o /Users/edward/pinetask/apple-touch-icon.png)"
     ]
   }
 }
