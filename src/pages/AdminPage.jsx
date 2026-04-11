@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../hooks/useTheme.js';
+import { useToast } from '../hooks/useToast.js';
 import { apiGet } from '../api/client.js';
 
 export default function AdminPage() {
@@ -9,6 +10,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const { showToast } = useToast();
 
   useEffect(() => {
     (async () => {
@@ -19,7 +21,7 @@ export default function AdminPage() {
         ]);
         setStats(statsRes.data);
         setUsers(usersRes.data || []);
-      } catch {}
+      } catch (err) { showToast?.(err?.message || 'Failed to load admin data'); }
       setLoading(false);
     })();
   }, [page, search]);

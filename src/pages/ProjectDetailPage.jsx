@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme.js';
+import { useToast } from '../hooks/useToast.js';
 import { apiGet, apiPatch, apiDelete } from '../api/client.js';
 import ProjectSidebar from '../components/projects/ProjectSidebar.jsx';
 import ProjectDetail from '../components/projects/ProjectDetail.jsx';
@@ -11,6 +12,7 @@ export default function ProjectDetailPage() {
   const { theme } = useTheme();
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('manage');
@@ -23,7 +25,7 @@ export default function ProjectDetailPage() {
     try {
       const res = await apiGet(`/api/projects/${id}`);
       setProject(res.data);
-    } catch {}
+    } catch (err) { showToast?.(err?.message || 'Failed to load project'); }
     setLoading(false);
   }, [id]);
 
@@ -42,12 +44,12 @@ export default function ProjectDetailPage() {
       await apiPatch(`/api/projects/${id}`, { name: editName.trim(), description: editDesc, color_idx: editColor });
       setEditing(false);
       fetchProject();
-    } catch {}
+    } catch (err) { showToast?.(err?.message || 'Failed to save project'); }
   };
 
   const handleDeleteProject = async () => {
     if (!confirm('Delete this project? Tasks and deadlines will be unlinked.')) return;
-    try { await apiDelete(`/api/projects/${id}`); navigate('/projects'); } catch {}
+    try { await apiDelete(`/api/projects/${id}`); navigate('/projects'); } catch (err) { showToast?.(err?.message || 'Failed to delete project'); }
   };
 
   if (loading) return (

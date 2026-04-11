@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from '../hooks/useTheme.js';
+import { useToast } from '../hooks/useToast.js';
 import { apiGet, apiPut } from '../api/client.js';
 
 const FONT_STACKS = {
@@ -12,13 +13,14 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const { showToast } = useToast();
 
   useEffect(() => {
     (async () => {
       try {
         const res = await apiGet('/api/account/settings');
         setSettings(res.data);
-      } catch {}
+      } catch (err) { showToast?.(err?.message || 'Failed to load settings'); }
       setLoading(false);
     })();
   }, []);
@@ -37,7 +39,7 @@ export default function SettingsPage() {
       await apiPut('/api/account/settings', next);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch {}
+    } catch (err) { showToast?.(err?.message || 'Failed to save settings'); }
   };
 
   if (loading) return (

@@ -71,7 +71,7 @@ export default function AccountPage() {
 
   const handleDeleteAccount = async () => {
     if (deleteConfirm !== user?.username) return;
-    try { await apiDelete('/api/account'); logout(); navigate('/'); } catch {}
+    try { await apiDelete('/api/account'); logout(); navigate('/'); } catch { setProfileMsg('Error deleting account'); }
   };
 
   const inputStyle = {

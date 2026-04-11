@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme.js';
+import { useToast } from '../hooks/useToast.js';
 import { apiGet, apiPost, apiPatch, apiDelete } from '../api/client.js';
 
 export default function ProjectsPage() {
@@ -14,12 +15,13 @@ export default function ProjectsPage() {
   const [colorIdx, setColorIdx] = useState(0);
   const [budget, setBudget] = useState('');
   const [search, setSearch] = useState('');
+  const { showToast } = useToast();
 
   const fetchProjects = async () => {
     try {
       const res = await apiGet('/api/projects');
       setProjects(res.data || []);
-    } catch {}
+    } catch (err) { showToast?.(err?.message || 'Failed to load projects'); }
     setLoading(false);
   };
 
@@ -38,7 +40,7 @@ export default function ProjectsPage() {
       }
       resetForm();
       fetchProjects();
-    } catch {}
+    } catch (err) { showToast?.(err?.message || 'Failed to save project'); }
   };
 
   const handleEdit = (p) => {
@@ -53,7 +55,7 @@ export default function ProjectsPage() {
   const handleDelete = async (id, e) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     if (!confirm('Delete this project? Tasks and deadlines will be unlinked.')) return;
-    try { await apiDelete(`/api/projects/${id}`); fetchProjects(); } catch {}
+    try { await apiDelete(`/api/projects/${id}`); fetchProjects(); } catch (err) { showToast?.(err?.message || 'Failed to delete project'); }
   };
 
   const filtered = projects.filter(p =>

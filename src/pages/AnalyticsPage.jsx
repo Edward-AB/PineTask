@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../hooks/useTheme.js';
+import { useToast } from '../hooks/useToast.js';
 import { apiGet } from '../api/client.js';
 import ProductivityChart from '../components/analytics/ProductivityChart.jsx';
 import CompletionHeatmap from '../components/analytics/CompletionHeatmap.jsx';
@@ -12,6 +13,7 @@ export default function AnalyticsPage() {
   const [stats, setStats] = useState(null);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
     (async () => {
@@ -22,7 +24,7 @@ export default function AnalyticsPage() {
         ]);
         setStats(statsRes.data);
         setProjects(projRes.data || []);
-      } catch {}
+      } catch (err) { showToast?.(err?.message || 'Failed to load analytics'); }
       setLoading(false);
     })();
   }, []);
