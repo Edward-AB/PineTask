@@ -1,0 +1,12 @@
+export const SLOT_HEIGHT = 16;
+export const SLOTS_PER_HOUR = 4;
+export const HOUR_HEIGHT = SLOT_HEIGHT * SLOTS_PER_HOUR;
+export const CALENDAR_HOURS = 24;
+export const TOTAL_SLOTS = 24 * SLOTS_PER_HOUR;
+export const CALENDAR_HEIGHT = CALENDAR_HOURS * SLOTS_PER_HOUR * SLOT_HEIGHT;
+export const CALENDAR_LABEL_WIDTH = 46;
+export const TOKEN_KEY = 'pt_token';
+export const THEME_KEY = 'pt_theme';
+export const DEFAULT_TASK_DURATION = 2;
+export const DEFAULT_WORK_START = 32; // 8:00 AM
+export const DEFAULT_WORK_END = 68;   // 5:00 PM
