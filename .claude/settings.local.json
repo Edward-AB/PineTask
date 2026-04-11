@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git init:*)",
+      "Bash(git remote:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(npm install:*)",
+      "Bash(git push:*)",
+      "mcp__9d8b289b-10dc-4cae-8126-fdfd431060c0__accounts_list",
+      "mcp__9d8b289b-10dc-4cae-8126-fdfd431060c0__set_active_account",
+      "mcp__9d8b289b-10dc-4cae-8126-fdfd431060c0__d1_database_query",
+      "Bash(npm run:*)"
+    ]
+  }
+}
