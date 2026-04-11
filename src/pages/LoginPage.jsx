@@ -29,15 +29,15 @@ export default function LoginPage() {
 
   const inputStyle = {
     width: '100%', padding: '10px 14px', borderRadius: theme.radius.md,
-    border: `1px solid ${theme.border}`, background: theme.surface,
+    border: `1px solid ${theme.border}`, background: theme.bgSecondary,
     color: theme.textPrimary, fontSize: theme.font.body, outline: 'none',
   };
 
   return (
     <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 24px' }}>
       <div style={{
-        padding: 32, borderRadius: theme.radius.xl, border: `1px solid ${theme.border}`,
-        background: theme.surface, boxShadow: theme.shadow.md,
+        padding: 32, borderRadius: theme.radius.xl, border: `0.5px solid ${theme.border}`,
+        background: theme.bgSecondary, boxShadow: theme.shadow.md,
       }}>
         <h1 style={{ fontSize: theme.font.headingLg, fontWeight: 600, color: theme.textPrimary, marginBottom: 8, textAlign: 'center' }}>
           Welcome back

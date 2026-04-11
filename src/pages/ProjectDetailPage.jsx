@@ -73,7 +73,7 @@ export default function ProjectDetailPage() {
         &larr; Back to projects
       </Link>
       {editing ? (
-        <div style={{ padding: 20, borderRadius: theme.radius.md, border: `1px solid ${theme.border}`, background: theme.bgSecondary, marginBottom: 20 }}>
+        <div style={{ padding: 20, borderRadius: theme.radius.md, border: `0.5px solid ${theme.border}`, background: theme.bgSecondary, marginBottom: 20 }}>
           <input value={editName} onChange={e => setEditName(e.target.value)} autoFocus style={{
             width: '100%', padding: '10px 14px', borderRadius: theme.radius.sm, border: `1px solid ${theme.border}`,
             background: theme.bg, color: theme.textPrimary, fontSize: theme.font.heading, fontWeight: 600,
@@ -103,7 +103,7 @@ export default function ProjectDetailPage() {
             <div style={{ width: 12, height: 12, borderRadius: '50%', background: dlc.dot }} />
             <h1 style={{ fontSize: theme.font.headingXl, fontWeight: 600, color: theme.textPrimary, margin: 0 }}>{project.name}</h1>
             <button onClick={handleStartEdit} title="Edit project" style={{
-              padding: '4px 10px', borderRadius: theme.radius.sm, border: `1px solid ${theme.border}`,
+              padding: '4px 10px', borderRadius: theme.radius.sm, border: `0.5px solid ${theme.border}`,
               color: theme.textSecondary, fontSize: theme.font.bodySmall, cursor: 'pointer', background: 'transparent',
             }}>{'\u270E'} Edit</button>
             <button onClick={handleDeleteProject} title="Delete project" style={{

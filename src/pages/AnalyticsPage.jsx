@@ -41,8 +41,8 @@ export default function AnalyticsPage() {
   const cardStyle = {
     padding: 28,
     borderRadius: theme.radius.lg,
-    border: `1px solid ${theme.border}`,
-    background: theme.surface,
+    border: `0.5px solid ${theme.border}`,
+    background: theme.bgSecondary,
   };
 
   const sectionTitle = {
@@ -67,8 +67,8 @@ export default function AnalyticsPage() {
           { label: 'Tasks This Week', value: s.tasks_this_week || 0, icon: '\ud83d\udcc5' },
         ].map((item, i) => (
           <div key={i} style={{
-            padding: 24, borderRadius: theme.radius.lg, border: `1px solid ${theme.border}`,
-            background: theme.surface,
+            padding: 24, borderRadius: theme.radius.lg, border: `0.5px solid ${theme.border}`,
+            background: theme.bgSecondary,
           }}>
             <div style={{ fontSize: 24, marginBottom: 8 }}>{item.icon}</div>
             <div style={{ fontSize: theme.font.headingLg, fontWeight: 600, color: theme.textPrimary }}>{item.value}</div>

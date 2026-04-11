@@ -8,8 +8,8 @@ export default function ChangelogPage() {
       <h1 style={{ fontSize: theme.font.headingXl, fontWeight: 600, color: theme.textPrimary, marginBottom: 28 }}>Changelog</h1>
 
       <div style={{
-        padding: 24, borderRadius: theme.radius.lg, border: `1px solid ${theme.border}`,
-        background: theme.surface,
+        padding: 24, borderRadius: theme.radius.lg, border: `0.5px solid ${theme.border}`,
+        background: theme.bgSecondary,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <span style={{

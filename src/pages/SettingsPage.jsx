@@ -50,8 +50,8 @@ export default function SettingsPage() {
   const s = settings || {};
 
   const sectionStyle = {
-    padding: 24, borderRadius: theme.radius.lg, border: `1px solid ${theme.border}`,
-    background: theme.surface, marginBottom: 16,
+    padding: 24, borderRadius: theme.radius.lg, border: `0.5px solid ${theme.border}`,
+    background: theme.bgSecondary, marginBottom: 16,
   };
 
   const labelStyle = { fontSize: theme.font.bodySmall, color: theme.textTertiary, marginBottom: 6, display: 'block' };

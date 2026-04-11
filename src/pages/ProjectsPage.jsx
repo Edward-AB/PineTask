@@ -77,7 +77,7 @@ export default function ProjectsPage() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..."
             style={{
               padding: '8px 14px', borderRadius: theme.radius.md, border: `1px solid ${theme.border}`,
-              background: theme.surface, color: theme.textPrimary, fontSize: theme.font.bodySmall,
+              background: theme.bgSecondary, color: theme.textPrimary, fontSize: theme.font.bodySmall,
               outline: 'none', width: 200,
             }} />
           <button onClick={() => setShowForm(true)} style={{
@@ -89,8 +89,8 @@ export default function ProjectsPage() {
 
       {showForm && (
         <div style={{
-          padding: 24, borderRadius: theme.radius.lg, border: `1px solid ${theme.border}`,
-          background: theme.surface, marginBottom: 20,
+          padding: 24, borderRadius: theme.radius.lg, border: `0.5px solid ${theme.border}`,
+          background: theme.bgSecondary, marginBottom: 20,
         }}>
           <div style={{ fontSize: theme.font.heading, fontWeight: 600, color: theme.textPrimary, marginBottom: 8 }}>
             {editingId ? 'Edit project' : 'New project'}
@@ -147,8 +147,8 @@ export default function ProjectsPage() {
             const dlc = theme.deadline[p.color_idx % theme.deadline.length];
             return (
               <Link to={`/projects/${p.id}`} key={p.id} style={{
-                padding: 24, borderRadius: theme.radius.lg, border: `1px solid ${theme.border}`,
-                background: theme.surface, textDecoration: 'none', display: 'block',
+                padding: 24, borderRadius: theme.radius.lg, border: `0.5px solid ${theme.border}`,
+                background: theme.bgSecondary, textDecoration: 'none', display: 'block',
                 transition: 'transform 200ms, box-shadow 200ms',
                 borderLeft: `4px solid ${dlc.dot}`,
               }}

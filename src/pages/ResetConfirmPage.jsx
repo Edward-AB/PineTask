@@ -6,8 +6,8 @@ export default function ResetConfirmPage() {
   return (
     <div style={{ maxWidth: 400, margin: '80px auto', padding: '0 24px', textAlign: 'center' }}>
       <div style={{
-        padding: 32, borderRadius: theme.radius.xl, border: `1px solid ${theme.border}`,
-        background: theme.surface,
+        padding: 32, borderRadius: theme.radius.xl, border: `0.5px solid ${theme.border}`,
+        background: theme.bgSecondary,
       }}>
         <h1 style={{ fontSize: theme.font.headingLg, fontWeight: 600, color: theme.textPrimary, marginBottom: 12 }}>
           Password Reset

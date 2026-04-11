@@ -48,8 +48,8 @@ export default function AdminPage() {
           { label: 'Signups This Week', value: s.signups_this_week || 0 },
         ].map((item, i) => (
           <div key={i} style={{
-            padding: 20, borderRadius: theme.radius.lg, border: `1px solid ${theme.border}`,
-            background: theme.surface,
+            padding: 20, borderRadius: theme.radius.lg, border: `0.5px solid ${theme.border}`,
+            background: theme.bgSecondary,
           }}>
             <div style={{ fontSize: theme.font.headingLg, fontWeight: 600, color: theme.textPrimary }}>{item.value}</div>
             <div style={{ fontSize: theme.font.bodySmall, color: theme.textTertiary, marginTop: 4 }}>{item.label}</div>
@@ -59,8 +59,8 @@ export default function AdminPage() {
 
       {/* Users table */}
       <div style={{
-        padding: 24, borderRadius: theme.radius.lg, border: `1px solid ${theme.border}`,
-        background: theme.surface,
+        padding: 24, borderRadius: theme.radius.lg, border: `0.5px solid ${theme.border}`,
+        background: theme.bgSecondary,
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h2 style={{ fontSize: theme.font.heading, fontWeight: 500, color: theme.textPrimary }}>Users</h2>

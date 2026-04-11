@@ -22,8 +22,8 @@ export default function HelpPage() {
   const { theme } = useTheme();
 
   const sectionStyle = {
-    padding: 24, borderRadius: theme.radius.lg, border: `1px solid ${theme.border}`,
-    background: theme.surface, marginBottom: 20,
+    padding: 24, borderRadius: theme.radius.lg, border: `0.5px solid ${theme.border}`,
+    background: theme.bgSecondary, marginBottom: 20,
   };
 
   return (
