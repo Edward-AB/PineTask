@@ -262,6 +262,15 @@ export default function DashboardPage() {
     }
   };
 
+  const handleEditDeadline = async (id, data) => {
+    try {
+      await apiPatch(`/api/deadlines/${id}`, data);
+      fetchData();
+    } catch (err) {
+      console.error('Edit deadline error:', err);
+    }
+  };
+
   const handleDeleteDeadline = async (id) => {
     try {
       await apiDelete(`/api/deadlines/${id}`);
@@ -329,6 +338,7 @@ export default function DashboardPage() {
       tasks={allTasks}
       projects={projects}
       onAdd={handleAddDeadline}
+      onEdit={handleEditDeadline}
       onDelete={handleDeleteDeadline}
     />
   );

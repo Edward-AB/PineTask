@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { useTheme } from '../../hooks/useTheme.js';
 import { dateKey } from '../../utils/dates.js';
 
-export default function DeadlineForm({ projects = [], onSubmit, onCancel }) {
+export default function DeadlineForm({ projects = [], onSubmit, onCancel, deadline }) {
   const { theme } = useTheme();
   const today = dateKey(new Date());
-  const [title, setTitle] = useState('');
-  const [desc, setDesc] = useState('');
-  const [startDate, setStartDate] = useState(today);
-  const [dueDate, setDueDate] = useState('');
-  const [colorIdx, setColorIdx] = useState(0);
-  const [projectId, setProjectId] = useState('');
+  const [title, setTitle] = useState(deadline?.title || '');
+  const [desc, setDesc] = useState(deadline?.description || '');
+  const [startDate, setStartDate] = useState(deadline?.start_date || today);
+  const [dueDate, setDueDate] = useState(deadline?.due_date || '');
+  const [colorIdx, setColorIdx] = useState(deadline?.color_idx ?? 0);
+  const [projectId, setProjectId] = useState(deadline?.project_id || '');
   const [error, setError] = useState('');
 
   const handleSubmit = (e) => {
@@ -68,7 +68,7 @@ export default function DeadlineForm({ projects = [], onSubmit, onCancel }) {
         <button type="submit" style={{
           padding: '5px 14px', borderRadius: theme.radius.sm, background: theme.accentBtn,
           color: theme.accentBtnText, fontWeight: 500, fontSize: theme.font.bodySmall,
-        }}>Create</button>
+        }}>{deadline ? 'Save' : 'Create'}</button>
         <button type="button" onClick={onCancel} style={{
           padding: '5px 14px', borderRadius: theme.radius.sm, border: `1px solid ${theme.border}`,
           color: theme.textSecondary, fontSize: theme.font.bodySmall,

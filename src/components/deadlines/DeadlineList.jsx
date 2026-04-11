@@ -6,6 +6,22 @@ import DeadlineForm from './DeadlineForm.jsx';
 export default function DeadlineList({ deadlines, tasks, projects, onAdd, onDelete, onEdit }) {
   const { theme } = useTheme();
   const [showForm, setShowForm] = useState(false);
+  const [editingDeadline, setEditingDeadline] = useState(null);
+
+  const handleEdit = (dl) => {
+    setEditingDeadline(dl);
+    setShowForm(true);
+  };
+
+  const handleSubmit = (data) => {
+    if (editingDeadline && onEdit) {
+      onEdit(editingDeadline.id, data);
+    } else {
+      onAdd(data);
+    }
+    setShowForm(false);
+    setEditingDeadline(null);
+  };
 
   // Group by project
   const grouped = {};
@@ -38,7 +54,7 @@ export default function DeadlineList({ deadlines, tasks, projects, onAdd, onDele
 
       {showForm && (
         <div style={{ marginBottom: 12 }}>
-          <DeadlineForm projects={projects} onSubmit={(dl) => { onAdd(dl); setShowForm(false); }} onCancel={() => setShowForm(false)} />
+          <DeadlineForm projects={projects} deadline={editingDeadline} onSubmit={handleSubmit} onCancel={() => { setShowForm(false); setEditingDeadline(null); }} />
         </div>
       )}
 
@@ -57,13 +73,13 @@ export default function DeadlineList({ deadlines, tasks, projects, onAdd, onDele
                   marginBottom: 6, marginTop: 4,
                 }}>{proj?.name || 'Project'}</div>
                 {dls.map(dl => (
-                  <DeadlineItem key={dl.id} deadline={dl} tasks={tasks || []} onDelete={onDelete} onEdit={onEdit} />
+                  <DeadlineItem key={dl.id} deadline={dl} tasks={tasks || []} onDelete={onDelete} onEdit={handleEdit} />
                 ))}
               </div>
             );
           })}
           {noProject.map(dl => (
-            <DeadlineItem key={dl.id} deadline={dl} tasks={tasks || []} onDelete={onDelete} onEdit={onEdit} />
+            <DeadlineItem key={dl.id} deadline={dl} tasks={tasks || []} onDelete={onDelete} onEdit={handleEdit} />
           ))}
         </div>
       )}
