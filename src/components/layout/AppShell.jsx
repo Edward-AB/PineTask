@@ -1,3 +1,4 @@
+import { Outlet } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme.js';
 import { useNarrow } from '../../hooks/useNarrow.js';
 import Header from './Header.jsx';
@@ -32,7 +33,7 @@ export default function AppShell({ children }) {
       <Header />
       <div style={bodyStyle}>
         {!narrow && <Sidebar />}
-        <main style={mainStyle}>{children}</main>
+        <main style={mainStyle}>{children || <Outlet />}</main>
       </div>
     </div>
   );

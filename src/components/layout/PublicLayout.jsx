@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme.js';
 import logoLight from '../../assets/logo-light.png';
 import logoDark from '../../assets/logo-dark.png';
@@ -123,7 +123,7 @@ export default function PublicLayout({ children }) {
           </Link>
         </div>
       </header>
-      <main style={mainStyle}>{children}</main>
+      <main style={mainStyle}>{children || <Outlet />}</main>
     </div>
   );
 }
