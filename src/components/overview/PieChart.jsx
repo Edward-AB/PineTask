@@ -4,7 +4,7 @@ import { useTheme } from '../../hooks/useTheme.js';
  * SVG donut chart for task breakdown.
  * segments: [{ value, color, label }]
  */
-export default function PieChart({ segments, size = 120 }) {
+export default function PieChart({ segments, size = 100, centerCount }) {
   const { theme } = useTheme();
   const cx = size / 2;
   const cy = size / 2;
@@ -33,9 +33,13 @@ export default function PieChart({ segments, size = 120 }) {
     return (
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={cx} cy={cy} r={r} fill="none" stroke={full.color} strokeWidth={8} />
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
-          fill={theme.textPrimary} fontSize={theme.font.heading} fontWeight={700}>
-          100%
+        <text x={cx} y={cy - 6} textAnchor="middle" dominantBaseline="central"
+          fill={theme.textPrimary} fontSize="16" fontWeight={700}>
+          {centerCount ?? total}
+        </text>
+        <text x={cx} y={cy + 8} textAnchor="middle" dominantBaseline="central"
+          fill={theme.textTertiary} fontSize="9" fontWeight={500}>
+          tasks
         </text>
       </svg>
     );
@@ -50,9 +54,6 @@ export default function PieChart({ segments, size = 120 }) {
     offset += seg.value;
     return { ...seg, dash, gap, rotation };
   });
-
-  const pctDone = segments.find((s) => s.label === 'Done');
-  const pctText = pctDone ? Math.round((pctDone.value / total) * 100) + '%' : '';
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -70,12 +71,14 @@ export default function PieChart({ segments, size = 120 }) {
           style={{ transition: 'stroke-dasharray 0.4s ease' }}
         />
       ))}
-      {pctText && (
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central"
-          fill={theme.textPrimary} fontSize={theme.font.heading} fontWeight={700}>
-          {pctText}
-        </text>
-      )}
+      <text x={cx} y={cy - 6} textAnchor="middle" dominantBaseline="central"
+        fill={theme.textPrimary} fontSize="16" fontWeight={700}>
+        {centerCount ?? total}
+      </text>
+      <text x={cx} y={cy + 8} textAnchor="middle" dominantBaseline="central"
+        fill={theme.textTertiary} fontSize="9" fontWeight={500}>
+        tasks
+      </text>
     </svg>
   );
 }

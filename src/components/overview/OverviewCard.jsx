@@ -98,7 +98,7 @@ export default function OverviewCard({ tasks }) {
     <div style={cardStyle}>
       <div style={titleStyle}>OVERVIEW</div>
       <div style={chartRowStyle}>
-        <PieChart segments={segments} />
+        <PieChart segments={segments} size={90} centerCount={total} />
         <div style={legendStyle}>
           {segments.filter((s) => s.value > 0).map((s) => (
             <div key={s.label} style={legendItem}>
