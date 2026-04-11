@@ -83,7 +83,7 @@ export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onN
               display: 'inline-flex', alignItems: 'center', gap: 3,
             }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: pc.dot }} />
-              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+              {task.priority}
             </span>
           )}
           {task.duration && (
