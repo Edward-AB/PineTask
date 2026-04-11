@@ -43,16 +43,16 @@ export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onN
       draggable
       onDragStart={e => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move'; }}
     >
-      {/* Checkbox */}
+      {/* Checkbox — custom SVG circle matching v1 */}
       <button onClick={() => onToggle(task.id, !task.done)} style={{
-        width: 18, height: 18, borderRadius: 4, flexShrink: 0, marginTop: 1,
-        border: `1.5px solid ${task.done ? theme.accent : theme.border}`,
-        background: task.done ? theme.accent : 'transparent',
+        width: 14, height: 14, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+        border: task.done ? 'none' : `1px solid ${theme.textTertiary}`,
+        background: task.done ? '#2D9B6F' : 'transparent', padding: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', transition: 'transform 250ms',
+        cursor: 'pointer', transition: 'transform 200ms',
       }}>
-        {task.done ? <svg width={10} height={10} viewBox="0 0 10 10" fill="none">
-          <path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        {task.done ? <svg width={8} height={8} viewBox="0 0 10 10" fill="none">
+          <path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
         </svg> : null}
       </button>
 
