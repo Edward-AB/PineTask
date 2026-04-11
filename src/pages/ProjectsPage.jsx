@@ -12,6 +12,7 @@ export default function ProjectsPage() {
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [colorIdx, setColorIdx] = useState(0);
+  const [budget, setBudget] = useState('');
   const [search, setSearch] = useState('');
 
   const fetchProjects = async () => {
@@ -24,16 +25,16 @@ export default function ProjectsPage() {
 
   useEffect(() => { fetchProjects(); }, []);
 
-  const resetForm = () => { setName(''); setDesc(''); setColorIdx(0); setShowForm(false); setEditingId(null); };
+  const resetForm = () => { setName(''); setDesc(''); setColorIdx(0); setBudget(''); setShowForm(false); setEditingId(null); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     try {
       if (editingId) {
-        await apiPatch(`/api/projects/${editingId}`, { name: name.trim(), description: desc, color_idx: colorIdx });
+        await apiPatch(`/api/projects/${editingId}`, { name: name.trim(), description: desc, color_idx: colorIdx, budget: budget ? Number(budget) : null });
       } else {
-        await apiPost('/api/projects', { name: name.trim(), description: desc, color_idx: colorIdx });
+        await apiPost('/api/projects', { name: name.trim(), description: desc, color_idx: colorIdx, budget: budget ? Number(budget) : null });
       }
       resetForm();
       fetchProjects();
@@ -45,6 +46,7 @@ export default function ProjectsPage() {
     setName(p.name);
     setDesc(p.description || '');
     setColorIdx(p.color_idx ?? 0);
+    setBudget(p.budget || '');
     setShowForm(true);
   };
 
@@ -100,6 +102,11 @@ export default function ProjectsPage() {
                 background: theme.bg, color: theme.textPrimary, fontSize: theme.font.body, outline: 'none',
               }} />
             <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description (optional)"
+              style={{
+                padding: '10px 14px', borderRadius: theme.radius.md, border: `1px solid ${theme.border}`,
+                background: theme.bg, color: theme.textPrimary, fontSize: theme.font.body, outline: 'none',
+              }} />
+            <input value={budget} onChange={e => setBudget(e.target.value)} placeholder="Budget (optional, e.g. 5000)" type="number" min="0" step="any"
               style={{
                 padding: '10px 14px', borderRadius: theme.radius.md, border: `1px solid ${theme.border}`,
                 background: theme.bg, color: theme.textPrimary, fontSize: theme.font.body, outline: 'none',
@@ -167,6 +174,7 @@ export default function ProjectsPage() {
                 <div style={{ display: 'flex', gap: 16, fontSize: theme.font.label, color: theme.textTertiary }}>
                   <span>{p.task_count || 0} tasks</span>
                   <span>{p.deadline_count || 0} deadlines</span>
+                  {p.budget && <span>Budget: {'\u00A3'}{Number(p.budget).toLocaleString()}</span>}
                 </div>
                 {p.task_count > 0 && (
                   <div style={{ marginTop: 12, height: 4, borderRadius: 2, background: theme.border, overflow: 'hidden' }}>
