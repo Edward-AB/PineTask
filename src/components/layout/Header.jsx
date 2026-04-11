@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../../hooks/useTheme.js';
+import useTimer from '../../hooks/useTimer.js';
 import logoLight from '../../assets/logo-light.png';
 import logoDark from '../../assets/logo-dark.png';
 import ProfileDropdown from './ProfileDropdown.jsx';
 import Tooltip from '../shared/Tooltip.jsx';
+import TimerButton from '../timer/TimerButton.jsx';
+import TimerPopup from '../timer/TimerPopup.jsx';
+import TimerAlarmModal from '../timer/TimerAlarmModal.jsx';
 
 const NAV_LINKS = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -16,6 +20,41 @@ export default function Header() {
   const { theme, themeMode, toggleTheme } = useTheme();
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [timerPopupOpen, setTimerPopupOpen] = useState(false);
+  const timerSlotRef = useRef(null);
+  const { timerState, startTimer, pauseTimer, resumeTimer, cancelTimer, addTime } = useTimer();
+
+  const lastTotalRef = useRef(null);
+  if (timerState && timerState.total) lastTotalRef.current = timerState.total;
+
+  const handleTimerButtonClick = () => {
+    if (timerState?.state === 'done') {
+      // alarm modal handles this -- no popup toggle
+      return;
+    }
+    setTimerPopupOpen((o) => !o);
+  };
+
+  const handleTimerStart = (minutes) => {
+    startTimer(minutes);
+    setTimerPopupOpen(false);
+  };
+
+  const handleTimerCancel = () => {
+    cancelTimer();
+    setTimerPopupOpen(false);
+  };
+
+  const handleAlarmRepeat = () => {
+    const totalSeconds = lastTotalRef.current;
+    if (totalSeconds) {
+      startTimer(totalSeconds / 60);
+    }
+  };
+
+  const handleAlarmDismiss = () => {
+    cancelTimer();
+  };
 
   const logo = themeMode === 'dark' ? logoDark : logoLight;
 
@@ -142,8 +181,24 @@ export default function Header() {
       </div>
 
       <div style={rightStyle}>
-        {/* Timer placeholder slot */}
-        <div id="timer-slot" />
+        {/* Timer */}
+        <div ref={timerSlotRef} style={{ position: 'relative' }}>
+          <TimerButton timerState={timerState} onClick={handleTimerButtonClick} />
+          {timerPopupOpen && (
+            <TimerPopup
+              timerState={timerState}
+              onStart={handleTimerStart}
+              onPause={pauseTimer}
+              onResume={resumeTimer}
+              onCancel={handleTimerCancel}
+              onAddTime={addTime}
+              onClose={() => setTimerPopupOpen(false)}
+            />
+          )}
+          {timerState?.state === 'done' && (
+            <TimerAlarmModal onRepeat={handleAlarmRepeat} onDismiss={handleAlarmDismiss} />
+          )}
+        </div>
 
         <Tooltip text={themeMode === 'dark' ? 'Light mode' : 'Dark mode'}>
           <button style={iconBtnStyle} onClick={toggleTheme} aria-label="Toggle theme">
