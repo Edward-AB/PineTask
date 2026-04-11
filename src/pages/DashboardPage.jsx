@@ -1,0 +1,425 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useTheme } from '../hooks/useTheme.js';
+import { useAuth } from '../hooks/useAuth.js';
+import { useNarrow } from '../hooks/useNarrow.js';
+import { apiGet, apiPost, apiPatch, apiDelete, apiPut } from '../api/client.js';
+import { dateKey, todayKey, formatDate, getMonday, addDays } from '../utils/dates.js';
+import { playTick, playCelebration } from '../utils/sounds.js';
+import { DEFAULT_TASK_DURATION } from '../constants';
+
+// Sub-components
+import GreetingCard from '../components/dashboard/GreetingCard.jsx';
+import DayNoteCard from '../components/dashboard/DayNoteCard.jsx';
+import CelebrationOverlay from '../components/dashboard/CelebrationOverlay.jsx';
+import OverviewCard from '../components/overview/OverviewCard.jsx';
+import AddTaskForm from '../components/tasks/AddTaskForm.jsx';
+import TaskList from '../components/tasks/TaskList.jsx';
+import DeadlineList from '../components/deadlines/DeadlineList.jsx';
+import DaySchedule from '../components/calendar/DaySchedule.jsx';
+import NoteModal from '../components/notes/NoteModal.jsx';
+
+export default function DashboardPage() {
+  const { theme } = useTheme();
+  const { user } = useAuth();
+  const narrow = useNarrow();
+
+  // ── State ──────────────────────────────────────────
+  const [date, setDate] = useState(new Date());
+  const [allTasks, setAllTasks] = useState([]);
+  const [deadlines, setDeadlines] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [blockedTimes, setBlockedTimes] = useState([]);
+  const [dayNote, setDayNote] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [calView, setCalView] = useState('week');
+  const [noteTask, setNoteTask] = useState(null);
+  const [celebrating, setCelebrating] = useState(false);
+  const [celebratedKey, setCelebratedKey] = useState(null);
+
+  // ── Derived values ─────────────────────────────────
+  const dk = dateKey(date);
+  const monday = getMonday(date);
+  const sunday = addDays(monday, 6);
+  const fromStr = dateKey(monday);
+  const toStr = dateKey(sunday);
+  const dayTasks = allTasks.filter((t) => t.date === dk);
+
+  // ── Data fetching ──────────────────────────────────
+  const fetchData = useCallback(async () => {
+    try {
+      const [tasksRes, dlRes, projRes, evRes, btRes, noteRes] = await Promise.all([
+        apiGet(`/api/tasks?from=${fromStr}&to=${toStr}`).catch(() => []),
+        apiGet('/api/deadlines').catch(() => []),
+        apiGet('/api/projects').catch(() => []),
+        apiGet(`/api/events?from=${fromStr}&to=${toStr}`).catch(() => []),
+        apiGet('/api/blocked-times').catch(() => []),
+        apiGet(`/api/day-notes?date=${dk}`).catch(() => ({})),
+      ]);
+
+      // Normalize responses - the API may return arrays directly or {data: [...]}
+      const norm = (res) => Array.isArray(res) ? res : (res?.data || []);
+
+      setAllTasks(norm(tasksRes));
+      setDeadlines(norm(dlRes));
+      setProjects(norm(projRes));
+      setEvents(norm(evRes));
+      setBlockedTimes(norm(btRes));
+      setDayNote(noteRes?.content || noteRes?.note || noteRes?.text || noteRes?.data?.content || '');
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+    }
+    setLoading(false);
+  }, [fromStr, toStr, dk]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Re-fetch day note on date change within the same week
+  useEffect(() => {
+    apiGet(`/api/day-notes?date=${dk}`)
+      .then((res) => setDayNote(res?.content || res?.note || res?.text || res?.data?.content || ''))
+      .catch(() => setDayNote(''));
+  }, [dk]);
+
+  // Reset celebration flag when date changes
+  useEffect(() => {
+    setCelebratedKey(null);
+  }, [dk]);
+
+  // ── Celebration check ──────────────────────────────
+  useEffect(() => {
+    if (
+      dayTasks.length > 0 &&
+      dayTasks.every((t) => t.done) &&
+      celebratedKey !== dk
+    ) {
+      setCelebrating(true);
+      setCelebratedKey(dk);
+    }
+  }, [dayTasks, dk, celebratedKey]);
+
+  const handleCelebrationDone = useCallback(() => {
+    setCelebrating(false);
+  }, []);
+
+  // ── Task actions ───────────────────────────────────
+  const handleAddTask = async (taskData) => {
+    try {
+      const res = await apiPost('/api/tasks', {
+        ...taskData,
+        date: dk,
+        duration: taskData.duration || DEFAULT_TASK_DURATION,
+      });
+      const newTask = res?.data || res;
+      setAllTasks((prev) => [...prev, newTask]);
+    } catch (err) {
+      console.error('Add task error:', err);
+    }
+  };
+
+  const handleToggle = async (idOrTask, doneArg) => {
+    let id, newDone;
+    if (typeof idOrTask === 'object') {
+      id = idOrTask.id;
+      newDone = !idOrTask.done;
+    } else {
+      id = idOrTask;
+      newDone = doneArg;
+    }
+
+    playTick();
+    setAllTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, done: newDone ? 1 : 0 } : t))
+    );
+
+    try {
+      await apiPatch(`/api/tasks/${id}`, {
+        done: newDone ? 1 : 0,
+        done_at: newDone ? Date.now() : null,
+      });
+    } catch {
+      fetchData();
+    }
+  };
+
+  const handleDelete = async (idOrTask) => {
+    const id = typeof idOrTask === 'object' ? idOrTask.id : idOrTask;
+    const prev = allTasks;
+    setAllTasks((t) => t.filter((task) => task.id !== id));
+    try {
+      await apiDelete(`/api/tasks/${id}`);
+    } catch {
+      setAllTasks(prev);
+    }
+  };
+
+  const handleUpdate = async (id, updates) => {
+    setAllTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    );
+    try {
+      await apiPatch(`/api/tasks/${id}`, updates);
+    } catch {
+      fetchData();
+    }
+  };
+
+  const handleMove = async (idOrTask) => {
+    const id = typeof idOrTask === 'object' ? idOrTask.id : idOrTask;
+    const task = allTasks.find((t) => t.id === id);
+    if (!task) return;
+    const tomorrow = dateKey(addDays(new Date(task.date + 'T12:00:00'), 1));
+    setAllTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, date: tomorrow, slot: null } : t))
+    );
+    try {
+      await apiPatch(`/api/tasks/${id}`, { date: tomorrow, slot: null });
+    } catch {
+      fetchData();
+    }
+  };
+
+  const handleNoteOpen = (task) => {
+    setNoteTask(task);
+  };
+
+  const handleSaveNote = async (text) => {
+    if (!noteTask) return;
+    const id = noteTask.id;
+    setNoteTask(null);
+    handleUpdate(id, { note: text });
+  };
+
+  // ── Schedule actions ───────────────────────────────
+  const handleSlotClick = (slot) => {
+    // Placeholder for future quick-add at slot
+  };
+
+  const handleTaskDrop = async (taskId, slot) => {
+    setAllTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, slot, date: dk } : t))
+    );
+    try {
+      await apiPatch(`/api/tasks/${taskId}`, { slot, date: dk });
+    } catch {
+      fetchData();
+    }
+  };
+
+  const handleTaskToggle = (task) => {
+    handleToggle(task.id, !task.done);
+  };
+
+  const handleUnschedule = (taskId) => {
+    handleUpdate(taskId, { slot: null });
+  };
+
+  // ── Day note ───────────────────────────────────────
+  const handleSaveDayNote = async (content) => {
+    setDayNote(content);
+    try {
+      await apiPut('/api/day-notes', { date: dk, content });
+    } catch (err) {
+      console.error('Save day note error:', err);
+    }
+  };
+
+  // ── Deadline actions ───────────────────────────────
+  const handleAddDeadline = async (dlData) => {
+    try {
+      await apiPost('/api/deadlines', dlData);
+      fetchData();
+    } catch (err) {
+      console.error('Add deadline error:', err);
+    }
+  };
+
+  const handleDeleteDeadline = async (id) => {
+    try {
+      await apiDelete(`/api/deadlines/${id}`);
+      fetchData();
+    } catch (err) {
+      console.error('Delete deadline error:', err);
+    }
+  };
+
+  // ── Loading skeleton ───────────────────────────────
+  if (loading && allTasks.length === 0) {
+    return (
+      <div style={{ padding: narrow ? 12 : 24, maxWidth: 1400, margin: '0 auto' }}>
+        <div style={{
+          display: 'flex', gap: 20, flexWrap: 'wrap',
+        }}>
+          <div style={{ flex: '1 1 260px' }}>
+            <div style={{
+              height: 200, marginBottom: 16, borderRadius: theme.radius.lg,
+              background: theme.bgTertiary, animation: 'skeleton-pulse 1.5s ease infinite',
+            }} />
+            <div style={{
+              height: 300, borderRadius: theme.radius.lg,
+              background: theme.bgTertiary, animation: 'skeleton-pulse 1.5s ease infinite',
+            }} />
+          </div>
+          <div style={{ flex: '2 1 300px' }}>
+            <div style={{
+              height: 60, marginBottom: 16, borderRadius: theme.radius.lg,
+              background: theme.bgTertiary, animation: 'skeleton-pulse 1.5s ease infinite',
+            }} />
+            <div style={{
+              height: 400, borderRadius: theme.radius.lg,
+              background: theme.bgTertiary, animation: 'skeleton-pulse 1.5s ease infinite',
+            }} />
+          </div>
+          <div style={{ flex: '1.4 1 300px' }}>
+            <div style={{
+              height: 600, borderRadius: theme.radius.lg,
+              background: theme.bgTertiary, animation: 'skeleton-pulse 1.5s ease infinite',
+            }} />
+          </div>
+        </div>
+        <style>{`@keyframes skeleton-pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 0.7; } }`}</style>
+      </div>
+    );
+  }
+
+  // ── Shared sub-component blocks ───────────────────��
+  const greetingCard = (
+    <GreetingCard
+      date={date}
+      onDateChange={setDate}
+      tasks={dayTasks}
+      calView={calView}
+      onCalViewChange={setCalView}
+    />
+  );
+
+  const overviewCard = <OverviewCard tasks={dayTasks} />;
+
+  const deadlineList = (
+    <DeadlineList
+      deadlines={deadlines}
+      tasks={allTasks}
+      projects={projects}
+      onAdd={handleAddDeadline}
+      onDelete={handleDeleteDeadline}
+    />
+  );
+
+  const dayNoteCard = (
+    <DayNoteCard note={dayNote} onSave={handleSaveDayNote} />
+  );
+
+  const addTaskForm = (
+    <AddTaskForm
+      onAdd={handleAddTask}
+      deadlines={deadlines}
+      projects={projects}
+    />
+  );
+
+  const taskList = (
+    <TaskList
+      date={date}
+      tasks={allTasks}
+      allTasks={allTasks}
+      deadlines={deadlines}
+      onToggle={handleToggle}
+      onDelete={handleDelete}
+      onNote={handleNoteOpen}
+      onUpdate={handleUpdate}
+      onMove={handleMove}
+      onDrop={handleUnschedule}
+    />
+  );
+
+  const daySchedule = (
+    <DaySchedule
+      date={date}
+      tasks={allTasks}
+      deadlines={deadlines}
+      blockedTimes={blockedTimes}
+      events={events}
+      onSlotClick={handleSlotClick}
+      onTaskDrop={handleTaskDrop}
+      onTaskToggle={handleTaskToggle}
+    />
+  );
+
+  // ── Date header ────────────────────────────────────
+  const dateHeader = (
+    <div style={{ marginBottom: 16 }}>
+      <h2 style={{
+        fontSize: theme.font.headingLg,
+        fontWeight: 600,
+        color: theme.textPrimary,
+        margin: 0,
+      }}>
+        {formatDate(date)}
+      </h2>
+    </div>
+  );
+
+  // ── Narrow (mobile) layout ─────────────────────────
+  if (narrow) {
+    return (
+      <div style={{ padding: 12, maxWidth: 600, margin: '0 auto' }}>
+        {dateHeader}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {greetingCard}
+          {addTaskForm}
+          {taskList}
+          {daySchedule}
+          {overviewCard}
+          {deadlineList}
+          {dayNoteCard}
+        </div>
+
+        {noteTask && (
+          <NoteModal task={noteTask} onSave={handleSaveNote} onClose={() => setNoteTask(null)} />
+        )}
+        <CelebrationOverlay active={celebrating} onDone={handleCelebrationDone} />
+      </div>
+    );
+  }
+
+  // ── Wide (desktop) layout ──────────────────────────
+  return (
+    <div style={{ padding: 20, maxWidth: 1400, margin: '0 auto' }}>
+      {dateHeader}
+      <div style={{ display: 'flex', gap: 20 }}>
+        {/* Left column - 25% */}
+        <div style={{
+          width: '25%', minWidth: 260,
+          display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {greetingCard}
+          {overviewCard}
+          {deadlineList}
+        </div>
+
+        {/* Middle column - flex */}
+        <div style={{
+          flex: 1, minWidth: 300,
+          display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {dayNoteCard}
+          {addTaskForm}
+          {taskList}
+        </div>
+
+        {/* Right column - 35% */}
+        <div style={{ width: '35%', minWidth: 300 }}>
+          {daySchedule}
+        </div>
+      </div>
+
+      {/* Modals and overlays */}
+      {noteTask && (
+        <NoteModal task={noteTask} onSave={handleSaveNote} onClose={() => setNoteTask(null)} />
+      )}
+      <CelebrationOverlay active={celebrating} onDone={handleCelebrationDone} />
+    </div>
+  );
+}

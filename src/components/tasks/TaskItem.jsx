@@ -1,0 +1,132 @@
+import { useState } from 'react';
+import { useTheme } from '../../hooks/useTheme.js';
+import { slotToTime } from '../../utils/slots.js';
+
+export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onNote, onUpdate, onMove }) {
+  const { theme } = useTheme();
+  const [hover, setHover] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(task.text);
+
+  const tc = task.colorId
+    ? theme.taskColor.find(c => c.id === task.colorId) || theme.taskColor[0]
+    : theme.taskColor[0];
+
+  const pc = task.priority ? theme.priority[task.priority] : null;
+  const dl = task.deadlineId ? deadlines.find(d => d.id === task.deadlineId) : null;
+  const dlc = dl ? theme.deadline[dl.color_idx % theme.deadline.length] : null;
+
+  const handleDoubleClick = () => {
+    setEditing(true);
+    setEditText(task.text);
+  };
+
+  const handleEditSubmit = () => {
+    if (editText.trim() && editText.trim() !== task.text) {
+      onUpdate(task.id, { text: editText.trim() });
+    }
+    setEditing(false);
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px',
+        borderRadius: theme.radius.md, background: tc.bg,
+        borderLeft: `3px solid ${pc ? pc.border : tc.border}`,
+        transition: 'box-shadow 200ms',
+        boxShadow: hover ? theme.shadow.sm : 'none',
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      draggable
+      onDragStart={e => e.dataTransfer.setData('taskId', task.id)}
+    >
+      {/* Checkbox */}
+      <button onClick={() => onToggle(task.id, !task.done)} style={{
+        width: 18, height: 18, borderRadius: 4, flexShrink: 0, marginTop: 1,
+        border: `1.5px solid ${task.done ? theme.accent : theme.border}`,
+        background: task.done ? theme.accent : 'transparent',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', transition: 'transform 250ms',
+      }}>
+        {task.done && <svg width={10} height={10} viewBox="0 0 10 10" fill="none">
+          <path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>}
+      </button>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {editing ? (
+          <input value={editText} onChange={e => setEditText(e.target.value)}
+            onBlur={handleEditSubmit} onKeyDown={e => e.key === 'Enter' && handleEditSubmit()}
+            autoFocus style={{
+              width: '100%', fontSize: theme.font.body, border: `1px solid ${theme.borderFocus}`,
+              borderRadius: theme.radius.sm, padding: '2px 6px', background: theme.bg,
+              color: theme.textPrimary, outline: 'none',
+            }} />
+        ) : (
+          <div onDoubleClick={handleDoubleClick} style={{
+            fontSize: theme.font.body, color: tc.text,
+            textDecoration: task.done ? 'line-through' : 'none',
+            opacity: task.done ? 0.6 : 1, cursor: 'text',
+          }}>{task.text}</div>
+        )}
+
+        {/* Tags row */}
+        <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+          {pc && (
+            <span style={{
+              fontSize: 9, padding: '1px 6px', borderRadius: theme.radius.full,
+              background: pc.bg, color: pc.text, border: `0.5px solid ${pc.border}`,
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+            }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: pc.dot }} />
+              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+            </span>
+          )}
+          {task.duration && (
+            <span style={{ fontSize: 9, color: theme.textTertiary }}>{task.duration * 15}m</span>
+          )}
+          {task.slot != null && (
+            <span style={{ fontSize: 9, color: theme.textTertiary }}>{slotToTime(task.slot)}</span>
+          )}
+          {task.note && (
+            <span style={{ fontSize: 9, color: theme.textTertiary }} title="Has note">📝</span>
+          )}
+          {dl && dlc && (
+            <span style={{
+              fontSize: 9, padding: '1px 6px', borderRadius: theme.radius.full,
+              background: dlc.bg, color: dlc.text, border: `0.5px solid ${dlc.border}`,
+            }}>{dl.title}</span>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      {hover && !editing && (
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          {onNote && (
+            <button onClick={() => onNote(task)} title="Note" style={{
+              width: 24, height: 24, borderRadius: theme.radius.sm, fontSize: 11,
+              color: theme.textTertiary, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: `0.5px solid ${theme.border}`,
+            }}>📝</button>
+          )}
+          {onMove && (
+            <button onClick={() => onMove(task.id)} title="Move to tomorrow" style={{
+              width: 24, height: 24, borderRadius: theme.radius.sm, fontSize: 11,
+              color: theme.textTertiary, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: `0.5px solid ${theme.border}`,
+            }}>→</button>
+          )}
+          <button onClick={() => onDelete(task.id)} title="Delete" style={{
+            width: 24, height: 24, borderRadius: theme.radius.sm, fontSize: 11,
+            color: theme.danger, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: `0.5px solid ${theme.danger}40`,
+          }}>×</button>
+        </div>
+      )}
+    </div>
+  );
+}
