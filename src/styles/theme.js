@@ -1,7 +1,7 @@
 /** @module theme - Complete design token system for PineTask */
 
 const SHARED = {
-  radius: { sm: '6px', md: '10px', lg: '16px', xl: '20px', full: '9999px' },
+  radius: { sm: '8px', md: '14px', lg: '14px', xl: '20px', full: '9999px' },
   spacing: { xs: '4px', sm: '8px', md: '16px', lg: '24px', xl: '32px', xxl: '48px' },
   font: {
     label: '10px', bodySmall: '12px', body: '13px', heading: '16px',
@@ -48,8 +48,10 @@ export const forest = {
   // Calendar
   calBg: '#FAFAF8',
   hourRule: '#E8E5DE',
+  dashLine: '#EAE7E0',
   workingHoursBg: 'rgba(234,243,222,0.3)',
   nowLine: '#E24B4A',
+  rBar: '#97C459',
   // Selection
   selectedDay: '#EAF3DE',
   selectedDayBorder: '#639922',
@@ -59,8 +61,8 @@ export const forest = {
   priority: {
     none: { bg: '#F1EFE8', border: '#C8C4B8', text: '#6A6860', dot: '#A8A49C' },
     high: { bg: '#EAF3DE', border: '#97C459', text: '#27500A', dot: '#639922' },
-    medium: { bg: '#EAF2FC', border: '#88B8E8', text: '#1A4A7A', dot: '#5B9BD5' },
-    low: { bg: '#F0EDF9', border: '#B0A4E0', text: '#3A2E70', dot: '#9B89CC' },
+    medium: { bg: '#EAF2FC', border: '#88B8E8', text: '#1A4A7A', dot: '#A8C8F0' },
+    low: { bg: '#F0EDF9', border: '#9A90D4', text: '#3A2E70', dot: '#C5B8F0' },
   },
   // Deadline colours (6 presets)
   deadline: [
@@ -83,8 +85,8 @@ export const forest = {
   // Charts
   chartDone: '#2D9B6F',
   chartHigh: '#639922',
-  chartMedium: '#5B9BD5',
-  chartLow: '#9B89CC',
+  chartMedium: '#A8C8F0',
+  chartLow: '#C5B8F0',
   chartNone: '#C8C4B8',
   // Misc
   danger: '#E24B4A',
@@ -120,8 +122,10 @@ export const dark = {
   accentBtnText: '#C0F0E0',
   calBg: '#1A1E20',
   hourRule: '#2A3035',
+  dashLine: '#252A2D',
   workingHoursBg: 'rgba(26,53,48,0.3)',
   nowLine: '#FF6B6B',
+  rBar: '#5DCAA5',
   selectedDay: '#1A3530',
   selectedDayBorder: '#5DCAA5',
   selectedDayText: '#5DCAA5',
