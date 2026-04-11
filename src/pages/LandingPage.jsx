@@ -62,6 +62,10 @@ export default function LandingPage() {
                 color: theme.textSecondary, fontWeight: 500, fontSize: '16px', textDecoration: 'none',
                 border: `1px solid ${theme.border}`,
               }}>Sign in</Link>
+              <Link to="/pricing" style={{
+                padding: '14px 36px', borderRadius: theme.radius.lg, background: 'transparent',
+                color: theme.textTertiary, fontWeight: 500, fontSize: '16px', textDecoration: 'none',
+              }}>Pricing</Link>
             </>
           )}
         </div>
@@ -151,6 +155,7 @@ export default function LandingPage() {
           PineTask &copy; 2026. Made with 🌲 in London
         </div>
         <div style={{ display: 'flex', gap: 20 }}>
+          <Link to="/pricing" style={{ fontSize: theme.font.bodySmall, color: theme.textTertiary, textDecoration: 'none' }}>Pricing</Link>
           <Link to="/help" style={{ fontSize: theme.font.bodySmall, color: theme.textTertiary, textDecoration: 'none' }}>Help</Link>
           <Link to="/changelog" style={{ fontSize: theme.font.bodySmall, color: theme.textTertiary, textDecoration: 'none' }}>Changelog</Link>
         </div>

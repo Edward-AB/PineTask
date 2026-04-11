@@ -25,6 +25,7 @@ import SettingsPage from './pages/SettingsPage.jsx';
 import HelpPage from './pages/HelpPage.jsx';
 import ChangelogPage from './pages/ChangelogPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import PricingPage from './pages/PricingPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/reset-password" element={<PageTransition><ResetPasswordPage /></PageTransition>} />
         <Route path="/reset-password/:token" element={<PageTransition><ResetConfirmPage /></PageTransition>} />
         <Route path="/verify-email/:token" element={<PageTransition><VerifyEmailPage /></PageTransition>} />
+        <Route path="/pricing" element={<PageTransition><PricingPage /></PageTransition>} />
       </Route>
 
       {/* Onboarding (auth required, minimal layout) */}
