@@ -23,7 +23,7 @@ export default function AppShell({ children }) {
     });
   };
 
-  const sidebarWidth = sidebarCollapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
+  const sidebarWidth = sidebarCollapsed ? 0 : EXPANDED_WIDTH;
 
   const shellStyle = {
     display: 'flex',
@@ -49,9 +49,9 @@ export default function AppShell({ children }) {
   return (
     <DateProvider>
       <div style={shellStyle}>
-        <Header />
+        <Header onToggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
         <div style={bodyStyle}>
-          {!narrow && <Sidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />}
+          {!narrow && !sidebarCollapsed && <Sidebar collapsed={false} onToggle={toggleSidebar} />}
           <main style={mainStyle}>{children || <Outlet />}</main>
         </div>
       </div>
