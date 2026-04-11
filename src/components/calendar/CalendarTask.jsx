@@ -2,7 +2,7 @@ import { useTheme } from '../../hooks/useTheme.js';
 import { slotToTime } from '../../utils/slots.js';
 import { SLOT_HEIGHT, CALENDAR_LABEL_WIDTH } from '../../constants';
 
-export default function CalendarTask({ task, col, totalCols, colorObj, onToggle }) {
+export default function CalendarTask({ task, col, totalCols, colorObj, onToggle, deadlines }) {
   const { theme } = useTheme();
 
   const top = task.slot * SLOT_HEIGHT;
@@ -54,6 +54,18 @@ export default function CalendarTask({ task, col, totalCols, colorObj, onToggle 
     >
       <span style={{ opacity: 0.6, flexShrink: 0 }}>{timeStr}</span>
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.text}</span>
+      {task.deadline_id && deadlines && (() => {
+        const dl = deadlines.find(d => d.id === task.deadline_id);
+        if (!dl) return null;
+        const dlc = theme.deadline[dl.color_idx % theme.deadline.length];
+        return (
+          <span style={{
+            flexShrink: 0, fontSize: 9, padding: '0 4px', borderRadius: 3,
+            background: `${dlc.dot}30`, color: dlc.text, fontWeight: 500,
+            whiteSpace: 'nowrap',
+          }}>{dl.title}</span>
+        );
+      })()}
     </div>
   );
 }

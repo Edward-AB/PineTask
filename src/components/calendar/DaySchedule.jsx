@@ -188,6 +188,7 @@ export default function DaySchedule({
                 totalCols={layout.total}
                 colorObj={colorObj}
                 onToggle={onTaskToggle}
+                deadlines={deadlines}
               />
             );
           })}
