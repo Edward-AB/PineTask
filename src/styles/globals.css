@@ -98,6 +98,15 @@ img {
   display: block;
 }
 
+/* Hide scrollbar on left column */
+.col-scroll::-webkit-scrollbar {
+  display: none;
+}
+.col-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Utility classes */
 .sr-only {
   position: absolute;

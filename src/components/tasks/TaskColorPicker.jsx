@@ -7,8 +7,9 @@ export default function TaskColorPicker({ value, onChange }) {
     <div style={{ display: 'flex', gap: 6 }}>
       {theme.taskColor.map(c => (
         <button key={c.id} type="button" onClick={() => onChange(c.id)} style={{
-          flex: 1, height: 28, borderRadius: 8, background: c.bg,
-          border: value === c.id ? `2px solid ${theme.textPrimary}` : `1px solid ${c.border}`,
+          flex: 1, height: 28, borderRadius: 20, background: c.bg,
+          border: value === c.id ? `1.5px solid ${c.border}` : `1.5px solid ${c.border}88`,
+          boxShadow: value === c.id ? '0 0 0 2px ' + c.border : 'none',
           cursor: 'pointer', padding: 0, minWidth: 0,
           transition: 'transform 150ms',
           transform: value === c.id ? 'scale(1.05)' : 'scale(1)',

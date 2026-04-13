@@ -16,7 +16,7 @@ export default function StatsGrid({ total, done, left, scheduled }) {
         <div key={item.label} style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '6px 10px', borderRadius: theme.radius.sm,
-          border: `0.5px solid ${theme.border}`, background: theme.bgTertiary,
+          border: `0.5px solid ${theme.border}`, background: theme.bg,
         }}>
           <span style={{ fontSize: theme.font.bodySmall, color: theme.textSecondary, fontWeight: 500 }}>
             {item.label}

@@ -2,7 +2,7 @@ import { useTheme } from '../../hooks/useTheme.js';
 import PieChart from './PieChart.jsx';
 import StatsGrid from './StatsGrid.jsx';
 
-export default function OverviewCard({ tasks }) {
+export default function OverviewCard({ tasks, embedded }) {
   const { theme } = useTheme();
 
   const total = tasks.length;
@@ -94,8 +94,8 @@ export default function OverviewCard({ tasks }) {
     transition: 'width 0.4s ease',
   };
 
-  return (
-    <div style={cardStyle}>
+  const content = (
+    <>
       <div style={titleStyle}>OVERVIEW</div>
       <div style={chartRowStyle}>
         <PieChart segments={segments} size={90} centerCount={total} />
@@ -116,6 +116,14 @@ export default function OverviewCard({ tasks }) {
         <div style={fillStyle} />
       </div>
       <StatsGrid total={total} done={done} left={left} scheduled={scheduled} />
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div style={cardStyle}>
+      {content}
     </div>
   );
 }

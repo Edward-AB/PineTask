@@ -20,7 +20,7 @@ export default function Sidebar({ collapsed, onToggle }) {
 
   const sidebarStyle = {
     position: 'fixed',
-    top: 48,
+    top: 52,
     left: 0,
     bottom: 0,
     width,

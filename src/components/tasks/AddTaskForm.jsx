@@ -73,8 +73,8 @@ export default function AddTaskForm({ onAdd, deadlines = [], projects = [], inpu
                 onClick={() => setPriority(active ? null : key)}
                 style={{
                   flex: 1,
-                  padding: '6px 12px', borderRadius: theme.radius.md,
-                  fontSize: theme.font.body, fontWeight: 500,
+                  padding: '6px 12px', borderRadius: 20,
+                  fontSize: 12, fontWeight: 500,
                   background: active ? pc.bg : theme.bgTertiary,
                   color: active ? pc.text : theme.textSecondary,
                   border: `1px solid ${active ? pc.border : theme.border}`,

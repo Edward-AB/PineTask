@@ -4,7 +4,7 @@ import { slotToTime } from '../../utils/slots.js';
 
 export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onNote, onUpdate, onMove }) {
   const { theme } = useTheme();
-  const [hover, setHover] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(task.text);
   const [editingFields, setEditingFields] = useState(false);
@@ -32,29 +32,26 @@ export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onN
   return (
     <div
       style={{
-        display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px',
-        borderRadius: theme.radius.md, background: tc.bg,
-        borderLeft: `3px solid ${pc ? pc.border : tc.border}`,
-        transition: 'box-shadow 200ms',
-        boxShadow: hover ? theme.shadow.sm : 'none',
+        display: 'flex', alignItems: 'flex-start', gap: 7, padding: '5px 8px',
+        borderRadius: '0 8px 8px 0', background: tc.bg + '88',
+        borderLeft: `3px solid ${pc ? pc.dot : tc.border}`,
+        borderTop: `0.5px solid ${tc.border}`,
+        borderRight: `0.5px solid ${tc.border}`,
+        borderBottom: `0.5px solid ${tc.border}`,
+        marginBottom: 5,
       }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       draggable
       onDragStart={e => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move'; }}
     >
-      {/* Checkbox — custom SVG circle matching v1 */}
-      <button onClick={() => onToggle(task.id, !task.done)} style={{
-        width: 14, height: 14, borderRadius: '50%', flexShrink: 0, marginTop: 2,
-        border: task.done ? 'none' : `1px solid ${theme.textTertiary}`,
-        background: task.done ? '#2D9B6F' : 'transparent', padding: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', transition: 'transform 200ms',
-      }}>
-        {task.done ? <svg width={8} height={8} viewBox="0 0 10 10" fill="none">
-          <path d="M2 5l2.5 2.5L8 3" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-        </svg> : null}
-      </button>
+      {/* Checkbox — native HTML checkbox matching v1 */}
+      <input
+        type="checkbox"
+        checked={task.done}
+        onChange={() => onToggle(task.id, !task.done)}
+        style={{ width: 13, height: 13, cursor: 'pointer', flexShrink: 0 }}
+      />
 
       {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -62,23 +59,24 @@ export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onN
           <input value={editText} onChange={e => setEditText(e.target.value)}
             onBlur={handleEditSubmit} onKeyDown={e => e.key === 'Enter' && handleEditSubmit()}
             autoFocus style={{
-              width: '100%', fontSize: theme.font.body, border: `1px solid ${theme.borderFocus}`,
+              width: '100%', fontSize: 12, border: `1px solid ${theme.borderFocus}`,
               borderRadius: theme.radius.sm, padding: '2px 6px', background: theme.bg,
               color: theme.textPrimary, outline: 'none',
             }} />
         ) : (
           <div onDoubleClick={handleDoubleClick} style={{
-            fontSize: theme.font.body, color: tc.text,
+            fontSize: 12, lineHeight: 1.3, wordBreak: 'break-word',
+            color: task.done ? theme.textTertiary : tc.text,
             textDecoration: task.done ? 'line-through' : 'none',
-            opacity: task.done ? 0.6 : 1, cursor: 'text',
+            cursor: 'text',
           }}>{task.text}</div>
         )}
 
         {/* Tags row */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 7, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
           {pc && (
             <span style={{
-              fontSize: 9, padding: '1px 6px', borderRadius: theme.radius.full,
+              fontSize: 9, padding: '1px 5px 1px 4px', borderRadius: 20,
               background: pc.bg, color: pc.text, border: `0.5px solid ${pc.border}`,
               display: 'inline-flex', alignItems: 'center', gap: 3,
             }}>
@@ -87,14 +85,14 @@ export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onN
             </span>
           )}
           {task.duration && (
-            <span style={{ fontSize: 9, color: theme.textTertiary }}>{task.duration * 15}m</span>
+            <span style={{ fontSize: 10, color: theme.textTertiary }}>{task.duration * 15}m</span>
           )}
           {task.slot != null && (
-            <span style={{ fontSize: 9, color: theme.textTertiary }}>{slotToTime(task.slot)}</span>
+            <span style={{ fontSize: 10, color: theme.textTertiary }}>{slotToTime(task.slot)}</span>
           )}
           {task.note && (
             <span style={{ display: 'inline-flex', alignItems: 'center' }} title="Has note">
-              <svg width={10} height={10} viewBox="0 0 14 14" fill="none">
+              <svg width={12} height={12} viewBox="0 0 14 14" fill="none">
                 <rect x="2" y="1" width="10" height="12" rx="1.5" stroke={theme.textTertiary} strokeWidth="1.2"/>
                 <line x1="4.5" y1="4" x2="9.5" y2="4" stroke={theme.textTertiary} strokeWidth="1" strokeLinecap="round"/>
                 <line x1="4.5" y1="6.5" x2="9.5" y2="6.5" stroke={theme.textTertiary} strokeWidth="1" strokeLinecap="round"/>
@@ -141,19 +139,19 @@ export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onN
         )}
       </div>
 
-      {/* Actions */}
-      {hover && !editing && (
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+      {/* Actions — hover-only with opacity transition */}
+      {!editing && (
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0, opacity: hovered ? 1 : 0, transition: 'opacity 0.15s' }}>
           <button onClick={() => setEditingFields(!editingFields)} title="Edit fields" style={{
-            width: 24, height: 24, borderRadius: theme.radius.sm, fontSize: 11,
+            width: 26, height: 26, borderRadius: 6, fontSize: 11,
             color: editingFields ? theme.accent : theme.textTertiary, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: `0.5px solid ${editingFields ? theme.accent : theme.border}`,
+            border: `0.5px solid ${editingFields ? theme.accent : theme.border}`, background: 'transparent', cursor: 'pointer', padding: 0,
           }}>✎</button>
           {onNote && (
             <button onClick={() => onNote(task)} title="Note" style={{
-              width: 24, height: 24, borderRadius: theme.radius.sm,
+              width: 26, height: 26, borderRadius: 6,
               color: theme.textTertiary, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: `0.5px solid ${theme.border}`, padding: 0,
+              border: `0.5px solid ${theme.border}`, background: 'transparent', cursor: 'pointer', padding: 0,
             }}>
               <svg width={12} height={12} viewBox="0 0 14 14" fill="none">
                 <rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
@@ -165,15 +163,15 @@ export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onN
           )}
           {onMove && (
             <button onClick={() => onMove(task.id)} title="Move to tomorrow" style={{
-              width: 24, height: 24, borderRadius: theme.radius.sm, fontSize: 11,
+              width: 26, height: 26, borderRadius: 6, fontSize: 11,
               color: theme.textTertiary, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: `0.5px solid ${theme.border}`,
+              border: `0.5px solid ${theme.border}`, background: 'transparent', cursor: 'pointer', padding: 0,
             }}>→</button>
           )}
           <button onClick={() => onDelete(task.id)} title="Delete" style={{
-            width: 24, height: 24, borderRadius: theme.radius.sm, fontSize: 11,
+            width: 26, height: 26, borderRadius: 6, fontSize: 11,
             color: theme.danger, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: `0.5px solid ${theme.danger}40`,
+            border: `0.5px solid ${theme.danger}40`, background: 'transparent', cursor: 'pointer', padding: 0,
           }}>×</button>
         </div>
       )}

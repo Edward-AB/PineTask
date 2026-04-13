@@ -74,64 +74,79 @@ export default function Header({ onToggleSidebar, sidebarCollapsed }) {
 
   // --- Styles ---
   const headerStyle = {
-    position: 'fixed', top: 0, left: 0, right: 0, height: 48,
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '0 16px', background: theme.headerBg,
+    position: 'fixed', top: 0, left: 0, right: 0, height: 52,
+    display: 'grid', gridTemplateColumns: '1fr auto 1fr',
+    alignItems: 'center',
+    padding: '0 24px', background: theme.headerBg,
     borderBottom: `0.5px solid ${theme.headerBorder}`, zIndex: 900,
   };
 
-  const pillBtn = (active) => ({
-    display: 'flex', alignItems: 'center', gap: 5,
-    padding: '5px 10px', fontSize: '11px', fontWeight: 500,
+  const dividerStyle = {
+    width: 0.5, height: 20, background: theme.headerBorder,
+  };
+
+  const navBtn = (active) => ({
+    display: 'flex', alignItems: 'center', gap: 6,
+    height: 30, padding: '0 14px', fontSize: 11, fontWeight: 500,
     color: active ? theme.accentText : theme.headerText,
-    background: active ? theme.accentBg : 'transparent',
-    border: `1px solid ${active ? theme.accentBorder : theme.headerBorder}`,
-    borderRadius: theme.radius.xl, cursor: 'pointer',
+    background: active ? theme.accentBg : 'rgba(0,0,0,0.06)',
+    border: active ? `1px solid ${theme.accentBorder}` : `0.5px solid ${theme.headerBorder}`,
+    borderRadius: 8, cursor: 'pointer',
     textDecoration: 'none', fontFamily: 'inherit',
     transition: `all ${theme.transition}`,
   });
 
   const navArrow = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 26, height: 26, border: `1px solid ${theme.headerBorder}`,
-    borderRadius: theme.radius.sm, background: 'transparent',
-    color: theme.headerText, cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit',
+    background: 'none', border: `0.5px solid ${theme.headerBorder}`,
+    borderRadius: 7, padding: '4px 10px', fontSize: 14,
+    color: theme.headerText, cursor: 'pointer', fontFamily: 'inherit',
   };
 
   const todayBtn = {
-    padding: '3px 10px', fontSize: '11px', fontWeight: 500,
-    border: `1px solid ${theme.headerBorder}`, borderRadius: theme.radius.sm,
-    background: 'transparent', color: theme.headerText,
+    border: `0.5px solid ${theme.headerBorder}`, borderRadius: 7,
+    padding: '4px 9px', fontSize: 11, fontWeight: 500,
+    background: 'none', color: theme.headerText,
     cursor: 'pointer', fontFamily: 'inherit',
   };
 
-  const iconBtn = {
+  const hamburgerBtn = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 32, height: 32, border: 'none', background: 'transparent',
-    borderRadius: theme.radius.full, cursor: 'pointer',
+    borderRadius: '50%', cursor: 'pointer',
     color: theme.headerText, transition: `background ${theme.transition}`,
   };
 
   const profileBtn = {
-    ...iconBtn, width: 28, height: 28,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 28, height: 28, border: 'none',
     background: theme.accent, color: theme.accentBtnText,
-    fontSize: '11px', fontWeight: 700, position: 'relative',
+    fontSize: 11, fontWeight: 700, borderRadius: '50%',
+    cursor: 'pointer', position: 'relative',
   };
 
   const timerBtnStyle = {
     display: 'flex', alignItems: 'center', gap: 5,
-    padding: '5px 10px', fontSize: '11px', fontWeight: 500,
-    color: theme.headerText, background: 'transparent',
-    border: `1px solid ${theme.headerBorder}`,
-    borderRadius: theme.radius.xl, cursor: 'pointer', fontFamily: 'inherit',
+    height: 32, padding: '0 14px', fontSize: 11, fontWeight: 500,
+    color: theme.headerText, background: 'rgba(0,0,0,0.06)',
+    border: `0.5px solid ${theme.headerBorder}`,
+    borderRadius: 16, cursor: 'pointer', fontFamily: 'inherit',
+  };
+
+  const themeToggleBtn = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 32, height: 32, border: `0.5px solid ${theme.headerBorder}`,
+    background: 'transparent', borderRadius: '50%',
+    cursor: 'pointer', color: theme.headerText,
+    transition: `background ${theme.transition}`,
   };
 
   const signOutBtn = {
     display: 'flex', alignItems: 'center', gap: 4,
-    padding: '5px 10px', fontSize: '11px', fontWeight: 500,
+    padding: '5px 10px', fontSize: 11, fontWeight: 500,
     color: theme.headerText, background: 'transparent',
-    border: `1px solid ${theme.headerBorder}`,
-    borderRadius: theme.radius.xl, cursor: 'pointer', fontFamily: 'inherit',
+    border: `0.5px solid ${theme.headerBorder}`,
+    borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
   };
 
   // Timer display when running/paused
@@ -156,10 +171,10 @@ export default function Header({ onToggleSidebar, sidebarCollapsed }) {
 
   return (
     <header style={headerStyle}>
-      {/* Left: sidebar toggle + logo + nav pills */}
+      {/* Left: sidebar toggle + logo + divider + nav buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         {onToggleSidebar && (
-          <button style={iconBtn} onClick={onToggleSidebar} aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}>
+          <button style={hamburgerBtn} onClick={onToggleSidebar} aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}>
             <svg width={14} height={14} viewBox="0 0 16 16" fill="none">
               <path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"/>
             </svg>
@@ -168,30 +183,35 @@ export default function Header({ onToggleSidebar, sidebarCollapsed }) {
         <Link to="/dashboard">
           <img src={logo} alt="PineTask" style={{ height: 24, display: 'block' }} />
         </Link>
+        <div style={dividerStyle} />
         <div style={{ display: 'flex', gap: 4 }}>
           {NAV_ITEMS.map(({ to, label, icon }) => (
-            <Link key={to} to={to} style={pillBtn(location.pathname.startsWith(to))}>
+            <Link key={to} to={to} style={navBtn(location.pathname.startsWith(to))}>
               {icon}{label}
             </Link>
           ))}
         </div>
       </div>
 
-      {/* Center: date nav */}
-      {isDashboard && (
+      {/* Center: date nav (dashboard only) */}
+      {isDashboard ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button style={navArrow} onClick={() => setDate(addDays(date, -1))} aria-label="Previous day">{'\u2039'}</button>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: theme.headerText, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: theme.headerText, minWidth: 200, textAlign: 'center', whiteSpace: 'nowrap' }}>
             {formatDate(date)}
           </span>
           <button style={navArrow} onClick={() => setDate(addDays(date, 1))} aria-label="Next day">{'\u203A'}</button>
           <button style={todayBtn} onClick={() => setDate(new Date())}>Today</button>
         </div>
+      ) : (
+        <div />
       )}
 
-      {/* Right: time + timer + theme + profile + sign out */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: '13px', fontWeight: 600, color: theme.headerText, minWidth: 40, textAlign: 'right' }}>{timeStr}</span>
+      {/* Right: time + divider + timer + theme toggle + divider + profile + sign out */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: theme.headerText, minWidth: 40, textAlign: 'right' }}>{timeStr}</span>
+
+        <div style={dividerStyle} />
 
         {/* Timer */}
         <div ref={timerSlotRef} style={{ position: 'relative' }}>
@@ -216,10 +236,9 @@ export default function Header({ onToggleSidebar, sidebarCollapsed }) {
           {timerDone && <TimerAlarmModal onRepeat={handleAlarmRepeat} onDismiss={handleAlarmDismiss} />}
         </div>
 
-        <button style={iconBtn} onClick={toggleTheme} aria-label="Toggle theme"><ThemeIcon /></button>
+        <button style={themeToggleBtn} onClick={toggleTheme} aria-label="Toggle theme"><ThemeIcon /></button>
 
-        {/* Divider */}
-        <div style={{ width: 1, height: 20, background: theme.headerBorder }} />
+        <div style={dividerStyle} />
 
         {/* Profile */}
         <div style={{ position: 'relative' }}>

@@ -3,7 +3,7 @@ import { useTheme } from '../../hooks/useTheme.js';
 import DeadlineItem from './DeadlineItem.jsx';
 import DeadlineForm from './DeadlineForm.jsx';
 
-export default function DeadlineList({ deadlines, tasks, projects, onAdd, onDelete, onEdit }) {
+export default function DeadlineList({ deadlines, tasks, projects, onAdd, onDelete, onEdit, embedded }) {
   const { theme } = useTheme();
   const [showForm, setShowForm] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState(null);
@@ -35,11 +35,8 @@ export default function DeadlineList({ deadlines, tasks, projects, onAdd, onDele
     }
   });
 
-  return (
-    <div style={{
-      padding: 14, borderRadius: theme.radius.md, border: `0.5px solid ${theme.border}`,
-      background: theme.bgSecondary,
-    }}>
+  const content = (
+    <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{
           fontSize: theme.font.label, fontWeight: 500, color: theme.textTertiary,
@@ -83,6 +80,17 @@ export default function DeadlineList({ deadlines, tasks, projects, onAdd, onDele
           ))}
         </div>
       )}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div style={{
+      padding: 14, borderRadius: theme.radius.md, border: `0.5px solid ${theme.border}`,
+      background: theme.bgSecondary,
+    }}>
+      {content}
     </div>
   );
 }

@@ -37,25 +37,24 @@ export default function GreetingCard({ date, onDateChange, tasks, calView, onCal
 
   const toggleWrap = {
     display: 'flex',
-    gap: 4,
-    background: theme.bgTertiary,
-    borderRadius: theme.radius.sm,
-    padding: 2,
+    border: `0.5px solid ${theme.border}`,
+    borderRadius: 8,
+    overflow: 'hidden',
     marginBottom: 10,
   };
 
   const toggleBtn = (active) => ({
     flex: 1,
-    padding: '5px 0',
+    padding: '4px 9px',
     border: 'none',
-    borderRadius: theme.radius.sm,
-    background: active ? theme.surface : 'transparent',
-    color: active ? theme.textPrimary : theme.textTertiary,
-    fontSize: theme.font.bodySmall,
-    fontWeight: 600,
+    borderRadius: 0,
+    background: active ? theme.accent : 'transparent',
+    color: active ? theme.accentBtnText : theme.textSecondary,
+    fontSize: 11,
+    fontWeight: active ? 500 : 400,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    boxShadow: active ? theme.shadow.sm : 'none',
+    boxShadow: 'none',
     transition: `all ${theme.transition}`,
   });
 
