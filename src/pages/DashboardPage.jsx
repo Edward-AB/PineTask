@@ -396,6 +396,8 @@ export default function DashboardPage() {
       onSlotClick={handleSlotClick}
       onTaskDrop={handleTaskDrop}
       onTaskToggle={handleTaskToggle}
+      onTaskUpdate={handleUpdate}
+      onUnschedule={handleUnschedule}
     />
   );
 
@@ -427,6 +429,7 @@ export default function DashboardPage() {
       flex: 1, minHeight: 0, padding: '14px 20px', overflow: 'hidden',
       display: 'grid',
       gridTemplateColumns: '25% minmax(0,1fr) minmax(0,1fr)',
+      gridTemplateRows: 'minmax(0, 1fr)',
       gap: 14,
     }}>
       {/* Left column */}

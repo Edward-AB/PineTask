@@ -22,15 +22,16 @@ function PriorityTag({ priority, P }) {
 
 export default function CalendarTask({
   task, col, totalCols, colorObj, onToggle, deadlines,
-  onUnschedule, onResize, onDragStart: onDragStartProp,
+  onUnschedule, onResize, onResizeTop, onDragStart: onDragStartProp,
 }) {
   const { theme } = useTheme();
 
   const top = task.slot * SLOT_HEIGHT;
-  const height = Math.max(task.duration * SLOT_HEIGHT, SLOT_HEIGHT);
+  const height = Math.max((task.duration || 2) * SLOT_HEIGHT, SLOT_HEIGHT);
   const colPct = totalCols > 0 ? (100 / totalCols) : 100;
   const leftPct = col * colPct;
   const narrow = colPct <= 55;
+  const shortTask = height <= SLOT_HEIGHT * 3; // ≤45min: top-align
 
   const tc = colorObj || theme.taskColor[0];
   const P = theme.priority;
@@ -42,6 +43,11 @@ export default function CalendarTask({
 
   // Priority colors for checkbox accent
   const pc = P[task.priority || 'none'];
+
+  const handleBarStyle = {
+    width: 20, height: 2.5, borderRadius: 2,
+    background: tc.border, opacity: 0.9,
+  };
 
   return (
     <div
@@ -67,11 +73,16 @@ export default function CalendarTask({
         padding: '3px 6px',
         cursor: 'grab',
         display: 'flex',
-        alignItems: height <= SLOT_HEIGHT * 3 ? 'flex-start' : 'center',
+        alignItems: shortTask ? 'flex-start' : 'center',
         gap: 3,
         overflow: 'hidden',
       }}
     >
+      {/* Top resize handle */}
+      <div className="rh-top" onMouseDown={(e) => onResizeTop?.(e, task)}>
+        <div style={handleBarStyle} />
+      </div>
+
       <input
         type="checkbox"
         checked={task.done}
@@ -80,7 +91,7 @@ export default function CalendarTask({
         style={{
           width: 10, height: 10, flexShrink: 0,
           accentColor: pc.dot,
-          marginTop: 0,
+          marginTop: shortTask ? 2 : 0,
         }}
       />
       {narrow ? (
@@ -97,7 +108,7 @@ export default function CalendarTask({
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 3 }}>
             <PriorityTag priority={task.priority} P={P} />
             <span style={{ fontSize: 9, color: tc.dot, whiteSpace: 'nowrap' }}>
-              {slotToTime(task.slot)}&middot;{task.duration * 15}m
+              {slotToTime(task.slot)}&middot;{(task.duration || 2) * 15}m
             </span>
             {dl && dlC && (
               <span style={{
@@ -126,7 +137,7 @@ export default function CalendarTask({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <PriorityTag priority={task.priority} P={P} />
             <span style={{ fontSize: 9, color: tc.dot, whiteSpace: 'nowrap' }}>
-              {slotToTime(task.slot)}&middot;{task.duration * 15}m
+              {slotToTime(task.slot)}&middot;{(task.duration || 2) * 15}m
             </span>
             {dl && dlC && (
               <span style={{
@@ -147,14 +158,16 @@ export default function CalendarTask({
           background: 'none', border: 'none', cursor: 'pointer',
           color: tc.dot, fontSize: 10, padding: 0, lineHeight: 1,
           flexShrink: 0,
-          alignSelf: 'center',
-          marginTop: 0,
+          alignSelf: shortTask ? 'flex-start' : 'center',
+          marginTop: shortTask ? 1 : 0,
         }}
       >
         ↩
       </button>
+
+      {/* Bottom resize handle */}
       <div className="rh" onMouseDown={(e) => onResize?.(e, task)}>
-        <div style={{ width: 20, height: 2.5, borderRadius: 2, background: tc.border, opacity: 0.9 }} />
+        <div style={handleBarStyle} />
       </div>
     </div>
   );

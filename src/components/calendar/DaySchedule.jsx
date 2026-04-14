@@ -17,7 +17,7 @@ const HOURS_ARRAY = Array.from({ length: CALENDAR_HOURS }, (_, i) => i);
 
 export default function DaySchedule({
   date, tasks, deadlines, blockedTimes, events,
-  onSlotClick, onTaskDrop, onTaskToggle,
+  onSlotClick, onTaskDrop, onTaskToggle, onTaskUpdate, onUnschedule,
 }) {
   const { theme } = useTheme();
   const scrollRef = useRef(null);
@@ -113,6 +113,51 @@ export default function DaySchedule({
     document.body.appendChild(el);
     e.dataTransfer.setDragImage(el, 0, 0);
     setTimeout(() => document.body.removeChild(el), 0);
+  };
+
+  // v1 resize from bottom — adjust duration (v1 line 511)
+  const handleResize = (e, task) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startDur = task.duration || DEFAULT_TASK_DURATION;
+    function onMove(ev) {
+      const dy = ev.clientY - startY;
+      const newDur = Math.max(1, startDur + Math.round(dy / SLOT_HEIGHT));
+      onTaskUpdate?.(task.id, { duration: newDur });
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  // Resize from top — adjust both slot and duration
+  const handleResizeTop = (e, task) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const startSlot = task.slot ?? 0;
+    const startDur = task.duration || DEFAULT_TASK_DURATION;
+    function onMove(ev) {
+      const dy = ev.clientY - startY;
+      const slotDelta = Math.round(dy / SLOT_HEIGHT);
+      const newSlot = Math.max(0, startSlot + slotDelta);
+      const newDur = Math.max(1, startDur - slotDelta);
+      onTaskUpdate?.(task.id, { slot: newSlot, duration: newDur });
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  const handleUnscheduleTask = (taskId) => {
+    onUnschedule?.(taskId);
   };
 
   return (
@@ -264,6 +309,9 @@ export default function DaySchedule({
                   onToggle={onTaskToggle}
                   deadlines={deadlines}
                   onDragStart={handleTaskDragStart}
+                  onResize={handleResize}
+                  onResizeTop={handleResizeTop}
+                  onUnschedule={handleUnscheduleTask}
                 />
               );
             })}
