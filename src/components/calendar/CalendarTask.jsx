@@ -67,7 +67,7 @@ export default function CalendarTask({
         padding: '3px 6px',
         cursor: 'grab',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: height <= SLOT_HEIGHT * 3 ? 'flex-start' : 'center',
         gap: 3,
         overflow: 'hidden',
       }}

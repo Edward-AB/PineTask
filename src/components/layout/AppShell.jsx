@@ -29,7 +29,6 @@ export default function AppShell({ children }) {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
-    overflow: 'hidden',
     background: theme.bg,
   };
 
@@ -46,6 +45,7 @@ export default function AppShell({ children }) {
     minHeight: 0,
     display: 'flex',
     flexDirection: 'column',
+    overflow: 'hidden',
     padding: narrow ? '12px' : '12px 16px',
     marginLeft: narrow ? 0 : sidebarWidth,
     transition: 'margin-left 200ms ease',
