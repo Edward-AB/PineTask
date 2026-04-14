@@ -424,56 +424,61 @@ export default function DashboardPage() {
   }
 
   // ── Wide (desktop) layout ──────────────────────────
+  // v1 pattern: explicit height calc so grid rows are bounded and columns scroll
   return (
-    <div style={{
-      flex: 1, minHeight: 0, padding: '14px 20px', overflow: 'hidden',
-      display: 'grid',
-      gridTemplateColumns: '25% minmax(0,1fr) minmax(0,1fr)',
-      gridTemplateRows: 'minmax(0, 1fr)',
-      gap: 14,
-    }}>
-      {/* Left column */}
-      <div className="col-scroll" style={{
-        display: 'flex', flexDirection: 'column', gap: 12,
-        overflowY: 'auto', paddingRight: 2, paddingBottom: 14, minHeight: 0,
+    <>
+      <div style={{
+        height: 'calc(100vh - 76px)',
+        padding: '14px 20px',
+        display: 'grid',
+        gridTemplateColumns: '25% minmax(0,1fr) minmax(0,1fr)',
+        gridTemplateRows: 'minmax(0, 1fr)',
+        gap: 14,
+        overflow: 'hidden',
       }}>
-        {greetingCard}
-        <div style={{
-          background: theme.bgSecondary,
-          border: `0.5px solid ${theme.border}`,
-          borderRadius: theme.radius.md,
-          padding: 16,
-          display: 'flex',
-          flexDirection: 'column',
+        {/* Left column */}
+        <div className="col-scroll" style={{
+          display: 'flex', flexDirection: 'column', gap: 12,
+          overflowY: 'auto', paddingRight: 2, paddingBottom: 14, minHeight: 0,
         }}>
-          {overviewCardEmbedded}
+          {greetingCard}
           <div style={{
-            height: '0.5px',
-            background: theme.hourRule || theme.border,
-            margin: '16px 0 14px 0',
-            flexShrink: 0,
-          }} />
-          {deadlineListEmbedded}
+            background: theme.bgSecondary,
+            border: `0.5px solid ${theme.border}`,
+            borderRadius: theme.radius.md,
+            padding: 16,
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            {overviewCardEmbedded}
+            <div style={{
+              height: '0.5px',
+              background: theme.hourRule || theme.border,
+              margin: '16px 0 14px 0',
+              flexShrink: 0,
+            }} />
+            {deadlineListEmbedded}
+          </div>
         </div>
+
+        {/* Middle column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ flexShrink: 0, marginBottom: 10 }}>
+            {addTaskForm}
+          </div>
+          {taskList}
+          {dayNoteCard}
+        </div>
+
+        {/* Right column */}
+        {daySchedule}
       </div>
 
-      {/* Middle column */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minHeight: 0 }}>
-        <div style={{ flexShrink: 0, marginBottom: 10 }}>
-          {addTaskForm}
-        </div>
-        {taskList}
-        {dayNoteCard}
-      </div>
-
-      {/* Right column */}
-      {daySchedule}
-
-      {/* Modals and overlays */}
+      {/* Modals and overlays — outside grid so they don't create extra rows */}
       {noteTask && (
         <NoteModal task={noteTask} onSave={handleSaveNote} onClose={() => setNoteTask(null)} />
       )}
       <CelebrationOverlay active={celebrating} onDone={handleCelebrationDone} />
-    </div>
+    </>
   );
 }

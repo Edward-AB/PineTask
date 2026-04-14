@@ -16,20 +16,17 @@ html {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  height: 100%;
-  overflow: hidden;
+  scroll-behavior: smooth;
 }
 
 body {
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
   background: var(--bg);
   color: var(--text-primary);
 }
 
 #root {
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
 }
 
 /* Focus rings */
