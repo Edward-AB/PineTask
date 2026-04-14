@@ -16,7 +16,45 @@ export async function onRequestGet({ request, env, data }) {
       ORDER BY sort_order ASC, created_at ASC
     `).bind(data.userId, from, to).all();
 
-    return Response.json({ data: tasks.results });
+    // Enrich with team information (direct assignment OR via project-team assignment)
+    const results = tasks.results || [];
+    if (results.length > 0) {
+      const ids = results.map((t) => t.id);
+      const placeholders = ids.map(() => '?').join(',');
+      const assignRows = await env.DB.prepare(`
+        SELECT ta.task_id, t.id AS team_id, t.name AS team_name, t.color AS team_color
+        FROM task_assignments ta
+        JOIN teams t ON t.id = ta.team_id
+        WHERE ta.task_id IN (${placeholders})
+      `).bind(...ids).all();
+      const projectIds = results.map((t) => t.project_id).filter(Boolean);
+      let projAssignMap = new Map();
+      if (projectIds.length > 0) {
+        const projPlaceholders = projectIds.map(() => '?').join(',');
+        const projAssignRows = await env.DB.prepare(`
+          SELECT pta.project_id, t.id AS team_id, t.name AS team_name, t.color AS team_color
+          FROM project_team_assignments pta
+          JOIN teams t ON t.id = pta.team_id
+          WHERE pta.project_id IN (${projPlaceholders})
+        `).bind(...projectIds).all();
+        for (const r of projAssignRows.results || []) {
+          if (!projAssignMap.has(r.project_id)) projAssignMap.set(r.project_id, r);
+        }
+      }
+      const taskTeamMap = new Map();
+      for (const r of assignRows.results || []) {
+        if (!taskTeamMap.has(r.task_id)) taskTeamMap.set(r.task_id, r);
+      }
+      for (const t of results) {
+        let row = taskTeamMap.get(t.id);
+        if (!row && t.project_id) row = projAssignMap.get(t.project_id);
+        if (row) {
+          t.team = { id: row.team_id, name: row.team_name, color: row.team_color };
+        }
+      }
+    }
+
+    return Response.json({ data: results });
   } catch (e) {
     return Response.json({ error: 'Internal server error' }, { status: 500 });
   }

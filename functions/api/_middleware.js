@@ -15,6 +15,11 @@ const PUBLIC_ROUTES = [
   '/api/auth/verify-email',
 ];
 
+// Prefix-based public routes (e.g. invite lookup and decline)
+const PUBLIC_PREFIXES = [
+  '/api/invite/',
+];
+
 function addCorsHeaders(response) {
   const res = new Response(response.body, response);
   for (const [k, v] of Object.entries(CORS_HEADERS)) {
@@ -34,8 +39,11 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const path = url.pathname;
 
-  // Public routes skip auth
-  const isPublic = PUBLIC_ROUTES.some(r => path === r);
+  // Public routes skip auth — both exact matches and prefix matches
+  // Accept endpoints still require auth, so exclude /accept suffix from the prefix check.
+  const isPublicExact = PUBLIC_ROUTES.includes(path);
+  const isPublicPrefix = PUBLIC_PREFIXES.some((p) => path.startsWith(p)) && !path.endsWith('/accept');
+  const isPublic = isPublicExact || isPublicPrefix;
   if (!isPublic) {
     const auth = request.headers.get('Authorization') || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
