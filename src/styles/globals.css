@@ -107,6 +107,26 @@ img {
   scrollbar-width: none;
 }
 
+/* Task row — action buttons hidden until hover (v1 pattern) */
+.ta { opacity: 0; transition: opacity .15s; }
+.trow:hover .ta { opacity: 1 !important; }
+.cpill:hover { opacity: .9; }
+.rh {
+  cursor: ns-resize;
+  height: 7px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity .15s;
+  z-index: 10;
+}
+.cpill:hover .rh { opacity: 1; }
+
 /* Utility classes */
 .sr-only {
   position: absolute;

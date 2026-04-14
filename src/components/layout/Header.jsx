@@ -136,7 +136,7 @@ export default function Header({ onToggleSidebar, sidebarCollapsed }) {
   const themeToggleBtn = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 32, height: 32, border: `0.5px solid ${theme.headerBorder}`,
-    background: 'transparent', borderRadius: '50%',
+    background: 'rgba(0,0,0,0.06)', borderRadius: '50%',
     cursor: 'pointer', color: theme.headerText,
     transition: `background ${theme.transition}`,
   };
@@ -157,22 +157,19 @@ export default function Header({ onToggleSidebar, sidebarCollapsed }) {
   const ThemeIcon = () =>
     themeMode === 'dark' ? (
       <svg width={14} height={14} viewBox="0 0 16 16" fill="none">
-        <circle cx={8} cy={8} r={4} stroke="currentColor" strokeWidth={1.5} />
-        {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
-          const r = (a * Math.PI) / 180;
-          return <line key={a} x1={8 + Math.cos(r) * 5.5} y1={8 + Math.sin(r) * 5.5} x2={8 + Math.cos(r) * 7} y2={8 + Math.sin(r) * 7} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />;
-        })}
+        <circle cx={8} cy={8} r={3.5} fill={theme.headerText}/>
+        <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke={theme.headerText} strokeWidth={1.2} strokeLinecap="round"/>
       </svg>
     ) : (
       <svg width={14} height={14} viewBox="0 0 16 16" fill="none">
-        <path d="M13.5 9.5A5.5 5.5 0 016.5 2.5 5.5 5.5 0 1013.5 9.5z" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+        <path d="M13.5 10.5A6 6 0 015.5 2.5a6 6 0 108 8z" fill={theme.headerText}/>
       </svg>
     );
 
   return (
     <header style={headerStyle}>
       {/* Left: sidebar toggle + logo + divider + nav buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {onToggleSidebar && (
           <button style={hamburgerBtn} onClick={onToggleSidebar} aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}>
             <svg width={14} height={14} viewBox="0 0 16 16" fill="none">
@@ -208,8 +205,8 @@ export default function Header({ onToggleSidebar, sidebarCollapsed }) {
       )}
 
       {/* Right: time + divider + timer + theme toggle + divider + profile + sign out */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: theme.headerText, minWidth: 40, textAlign: 'right' }}>{timeStr}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'flex-end' }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: theme.headerText, minWidth: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.01em' }}>{timeStr}</span>
 
         <div style={dividerStyle} />
 
@@ -221,12 +218,12 @@ export default function Header({ onToggleSidebar, sidebarCollapsed }) {
             </button>
           ) : timerActive ? (
             <button style={{ ...timerBtnStyle, color: timerState.state === 'running' ? theme.success : theme.warning }} onClick={handleTimerClick}>
-              <svg width={12} height={12} viewBox="0 0 16 16" fill="none"><circle cx={8} cy={8} r={6.5} stroke="currentColor" strokeWidth={1.5}/><line x1={8} y1={4} x2={8} y2={8} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"/><line x1={8} y1={8} x2={11} y2={8} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"/></svg>
+              <svg width={12} height={12} viewBox="0 0 16 16" fill="none"><circle cx={8} cy={8} r={6} stroke="currentColor" strokeWidth={1.3}/><path d="M8 5v3.5l2 1.5" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round"/></svg>
               {formatTimerTime(timerState.remaining)}
             </button>
           ) : (
             <button style={timerBtnStyle} onClick={handleTimerClick}>
-              <svg width={12} height={12} viewBox="0 0 16 16" fill="none"><circle cx={8} cy={8} r={6.5} stroke="currentColor" strokeWidth={1.5}/><line x1={8} y1={4} x2={8} y2={8} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"/><line x1={8} y1={8} x2={11} y2={8} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round"/></svg>
+              <svg width={12} height={12} viewBox="0 0 16 16" fill="none"><circle cx={8} cy={8} r={6} stroke="currentColor" strokeWidth={1.3}/><path d="M8 5v3.5l2 1.5" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round"/></svg>
               Timer
             </button>
           )}
@@ -254,10 +251,8 @@ export default function Header({ onToggleSidebar, sidebarCollapsed }) {
 
         {/* Sign out */}
         <button style={signOutBtn} onClick={handleSignOut}>
-          <svg width={12} height={12} viewBox="0 0 16 16" fill="none">
-            <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round"/>
-            <path d="M11 11l3-3-3-3" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M14 8H6" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round"/>
+          <svg width={12} height={12} viewBox="0 0 14 14" fill="none">
+            <path d="M9 1h4v12H9M6 10l-4-3 4-3M2 7h8" stroke={theme.headerText} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Sign out
         </button>

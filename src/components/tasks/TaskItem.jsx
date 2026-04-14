@@ -2,177 +2,192 @@ import { useState } from 'react';
 import { useTheme } from '../../hooks/useTheme.js';
 import { slotToTime } from '../../utils/slots.js';
 
+/* ── v1 helper: NpIcon (note/page icon) ── */
+function NpIcon({ has, color, size = 12 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, verticalAlign: 'middle' }}>
+      <rect x={1} y={1} width={10} height={10} rx={1.5} stroke={color} strokeWidth={1.2}
+        fill={has ? 'currentColor' : 'none'} fillOpacity={has ? 0.18 : 0} />
+      <line x1={3} y1={4} x2={9} y2={4} stroke={color} strokeWidth={1} />
+      <line x1={3} y1={6.5} x2={9} y2={6.5} stroke={color} strokeWidth={1} />
+      <line x1={3} y1={9} x2={7} y2={9} stroke={color} strokeWidth={1} />
+    </svg>
+  );
+}
+
+/* ── v1 helper: PriorityTag ── */
+function PriorityTag({ priority, P }) {
+  const c = P[priority || 'none'];
+  return (
+    <span style={{
+      fontSize: 9, padding: '1px 5px 1px 4px', borderRadius: 20,
+      background: c.bg, color: c.text, border: `0.5px solid ${c.border}`,
+      flexShrink: 0, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3,
+    }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot, flexShrink: 0, display: 'inline-block' }} />
+      {priority || 'none'}
+    </span>
+  );
+}
+
+/* ── v1 helper: AB (action button base style) ── */
+const AB = (t) => ({
+  width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  borderRadius: 6, border: `0.5px solid ${t.border}`, background: 'transparent',
+  cursor: 'pointer', flexShrink: 0, padding: 0, lineHeight: 1,
+});
+
 export default function TaskItem({ task, deadlines = [], onToggle, onDelete, onNote, onUpdate, onMove }) {
-  const { theme } = useTheme();
-  const [hovered, setHovered] = useState(false);
+  const { theme: t } = useTheme();
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(task.text);
-  const [editingFields, setEditingFields] = useState(false);
+  const [editPri, setEditPri] = useState(task.priority || null);
+  const [editDur, setEditDur] = useState(task.duration || 2);
 
+  const P = t.priority;
+  const DLC = t.deadline;
+
+  // Task colour
   const tc = task.colorId
-    ? theme.taskColor.find(c => c.id === task.colorId) || theme.taskColor[0]
-    : theme.taskColor[0];
+    ? t.taskColor.find(c => c.id === task.colorId) || t.taskColor[0]
+    : t.taskColor[0];
 
-  const pc = task.priority ? theme.priority[task.priority] : null;
-  const dl = task.deadlineId ? deadlines.find(d => d.id === task.deadlineId) : null;
-  const dlc = dl ? theme.deadline[dl.color_idx % theme.deadline.length] : null;
+  // Priority colour (always resolves, "none" is fallback)
+  const pc = P[task.priority || 'none'];
 
-  const handleDoubleClick = () => {
+  // Deadline lookup
+  const dlId = task.deadlineId || task.deadline_id;
+  const dl = dlId ? deadlines.find(d => d.id === dlId) : null;
+  const dlC = dl ? DLC[(dl.color_idx ?? dl.colorIdx ?? 0) % DLC.length] : null;
+
+  // Has note?
+  const hN = !!(task.note && task.note.trim());
+
+  // Is scheduled?
+  const isScheduled = task.slot != null;
+
+  // ── Edit handlers ──
+  const startEdit = () => {
     setEditing(true);
     setEditText(task.text);
+    setEditPri(task.priority || null);
+    setEditDur(task.duration || 2);
   };
 
-  const handleEditSubmit = () => {
-    if (editText.trim() && editText.trim() !== task.text) {
-      onUpdate(task.id, { text: editText.trim() });
-    }
+  const saveEdit = () => {
+    const updates = {};
+    const trimmed = editText.trim();
+    if (trimmed && trimmed !== task.text) updates.text = trimmed;
+    if (editPri !== (task.priority || null)) updates.priority = editPri;
+    if (editDur !== (task.duration || 2)) updates.duration = editDur;
+    if (Object.keys(updates).length > 0) onUpdate(task.id, updates);
     setEditing(false);
   };
 
+  const cancelEdit = () => setEditing(false);
+
   return (
     <div
+      className="trow"
+      draggable={!isScheduled}
+      onDragStart={!isScheduled ? e => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move'; } : undefined}
       style={{
-        display: 'flex', alignItems: 'flex-start', gap: 7, padding: '5px 8px',
-        borderRadius: '0 8px 8px 0', background: tc.bg + '88',
-        borderLeft: `3px solid ${pc ? pc.dot : tc.border}`,
+        display: 'flex', alignItems: 'center', gap: 7,
+        borderRadius: '0 8px 8px 0',
+        background: tc.bg + '88',
+        padding: '5px 8px', marginBottom: 5,
+        cursor: isScheduled ? 'default' : 'grab',
+        userSelect: 'none', boxSizing: 'border-box',
         borderTop: `0.5px solid ${tc.border}`,
         borderRight: `0.5px solid ${tc.border}`,
         borderBottom: `0.5px solid ${tc.border}`,
-        marginBottom: 5,
+        borderLeft: `3px solid ${pc.dot}`,
       }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      draggable
-      onDragStart={e => { e.dataTransfer.setData('text/plain', task.id); e.dataTransfer.effectAllowed = 'move'; }}
     >
-      {/* Checkbox — native HTML checkbox matching v1 */}
-      <input
-        type="checkbox"
-        checked={task.done}
-        onChange={() => onToggle(task.id, !task.done)}
-        style={{ width: 13, height: 13, cursor: 'pointer', flexShrink: 0 }}
-      />
+      {/* Checkbox */}
+      <input type="checkbox" checked={task.done} onChange={() => onToggle(task.id, !task.done)} style={{ flexShrink: 0 }} />
 
       {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
         {editing ? (
-          <input value={editText} onChange={e => setEditText(e.target.value)}
-            onBlur={handleEditSubmit} onKeyDown={e => e.key === 'Enter' && handleEditSubmit()}
-            autoFocus style={{
-              width: '100%', fontSize: 12, border: `1px solid ${theme.borderFocus}`,
-              borderRadius: theme.radius.sm, padding: '2px 6px', background: theme.bg,
-              color: theme.textPrimary, outline: 'none',
-            }} />
-        ) : (
-          <div onDoubleClick={handleDoubleClick} style={{
-            fontSize: 12, lineHeight: 1.3, wordBreak: 'break-word',
-            color: task.done ? theme.textTertiary : tc.text,
-            textDecoration: task.done ? 'line-through' : 'none',
-            cursor: 'text',
-          }}>{task.text}</div>
-        )}
-
-        {/* Tags row */}
-        <div style={{ display: 'flex', gap: 7, marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-          {pc && (
-            <span style={{
-              fontSize: 9, padding: '1px 5px 1px 4px', borderRadius: 20,
-              background: pc.bg, color: pc.text, border: `0.5px solid ${pc.border}`,
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-            }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: pc.dot }} />
-              {task.priority}
-            </span>
-          )}
-          {task.duration && (
-            <span style={{ fontSize: 10, color: theme.textTertiary }}>{task.duration * 15}m</span>
-          )}
-          {task.slot != null && (
-            <span style={{ fontSize: 10, color: theme.textTertiary }}>{slotToTime(task.slot)}</span>
-          )}
-          {task.note && (
-            <span style={{ display: 'inline-flex', alignItems: 'center' }} title="Has note">
-              <svg width={12} height={12} viewBox="0 0 14 14" fill="none">
-                <rect x="2" y="1" width="10" height="12" rx="1.5" stroke={theme.textTertiary} strokeWidth="1.2"/>
-                <line x1="4.5" y1="4" x2="9.5" y2="4" stroke={theme.textTertiary} strokeWidth="1" strokeLinecap="round"/>
-                <line x1="4.5" y1="6.5" x2="9.5" y2="6.5" stroke={theme.textTertiary} strokeWidth="1" strokeLinecap="round"/>
-                <line x1="4.5" y1="9" x2="7.5" y2="9" stroke={theme.textTertiary} strokeWidth="1" strokeLinecap="round"/>
-              </svg>
-            </span>
-          )}
-          {dl && dlc && (
-            <span style={{
-              fontSize: 9, padding: '1px 6px', borderRadius: theme.radius.full,
-              background: dlc.bg, color: dlc.text, border: `0.5px solid ${dlc.border}`,
-            }}>{dl.title}</span>
-          )}
-        </div>
-
-        {/* Inline field editor (Dev-43) */}
-        {editingFields && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <select value={task.priority || ''} onChange={e => onUpdate(task.id, { priority: e.target.value || null })}
-              style={{ fontSize: 10, padding: '2px 4px', borderRadius: theme.radius.sm, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.textPrimary }}>
-              <option value="">No priority</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-            <select value={task.duration || 2} onChange={e => onUpdate(task.id, { duration: Number(e.target.value) })}
-              style={{ fontSize: 10, padding: '2px 4px', borderRadius: theme.radius.sm, border: `1px solid ${theme.border}`, background: theme.bg, color: theme.textPrimary }}>
-              {[1,2,3,4,6,8,12].map(d => <option key={d} value={d}>{d * 15}m</option>)}
-            </select>
-            <div style={{ display: 'flex', gap: 3 }}>
-              {theme.taskColor.map(c => (
-                <button key={c.id} onClick={() => onUpdate(task.id, { color_id: c.id })} style={{
-                  width: 20, height: 12, borderRadius: 4, background: c.bg, padding: 0,
-                  border: (task.color_id || task.colorId) === c.id ? `1.5px solid ${theme.textPrimary}` : `1px solid ${c.border}`,
+          <div>
+            <input value={editText} onChange={e => setEditText(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveEdit()} autoFocus
+              style={{
+                width: '100%', fontSize: 12, borderRadius: 6,
+                border: `0.5px solid ${t.border}`, padding: '3px 7px',
+                marginBottom: 4, boxSizing: 'border-box',
+                background: t.bg, color: t.textPrimary,
+              }} />
+            <div style={{ display: 'flex', gap: 3, marginBottom: 4 }}>
+              {['high', 'medium', 'low'].map(p => (
+                <button key={p} onClick={() => setEditPri(editPri === p ? null : p)} style={{
+                  flex: 1, fontSize: 10, padding: '2px 0', borderRadius: 20,
+                  border: `1px solid ${editPri === p ? P[p].border : t.border}`,
+                  background: editPri === p ? P[p].bg : 'transparent',
+                  color: editPri === p ? P[p].text : t.textSecondary,
                   cursor: 'pointer',
-                }} />
+                }}>{p}</button>
               ))}
             </div>
-            <button onClick={() => setEditingFields(false)} style={{
-              fontSize: 9, padding: '1px 6px', borderRadius: theme.radius.sm,
-              border: `1px solid ${theme.border}`, color: theme.textTertiary, cursor: 'pointer',
-            }}>Done</button>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={saveEdit} style={{
+                flex: 1, fontSize: 11, padding: '3px 0', borderRadius: 6,
+                border: 'none', background: t.accentBtn, color: t.accentBtnText, cursor: 'pointer',
+              }}>Save</button>
+              <button onClick={cancelEdit} style={{
+                flex: 1, fontSize: 11, padding: '3px 0', borderRadius: 6,
+                border: `0.5px solid ${t.border}`, background: 'transparent',
+                color: t.textSecondary, cursor: 'pointer',
+              }}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div style={{
+              fontSize: 12, color: task.done ? t.textTertiary : tc.text,
+              textDecoration: task.done ? 'line-through' : 'none',
+              lineHeight: 1.3, wordBreak: 'break-word',
+            }}>{task.text}</div>
+            <div style={{ display: 'flex', gap: 7, marginTop: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+              <PriorityTag priority={task.priority} P={P} />
+              <span style={{ fontSize: 10, color: t.textTertiary }}>{(task.duration || 2) * 15}m</span>
+              {isScheduled && <span style={{ fontSize: 10, color: t.textTertiary }}>{slotToTime(task.slot)}</span>}
+              {hN && (
+                <span onClick={() => onNote && onNote(task)} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', color: tc.dot }}>
+                  <NpIcon has={true} color={tc.dot} />
+                </span>
+              )}
+              {dl && dlC && (
+                <span style={{
+                  fontSize: 10, padding: '0px 6px', borderRadius: 20,
+                  background: dlC.bg, color: dlC.text, border: `0.5px solid ${dlC.border}`, whiteSpace: 'nowrap',
+                }}>{dl.title}</span>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Actions — hover-only with opacity transition */}
+      {/* Action buttons — v1 pattern: className="ta" for CSS hover reveal */}
       {!editing && (
-        <div style={{ display: 'flex', gap: 4, flexShrink: 0, opacity: hovered ? 1 : 0, transition: 'opacity 0.15s' }}>
-          <button onClick={() => setEditingFields(!editingFields)} title="Edit fields" style={{
-            width: 26, height: 26, borderRadius: 6, fontSize: 11,
-            color: editingFields ? theme.accent : theme.textTertiary, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: `0.5px solid ${editingFields ? theme.accent : theme.border}`, background: 'transparent', cursor: 'pointer', padding: 0,
-          }}>✎</button>
-          {onNote && (
-            <button onClick={() => onNote(task)} title="Note" style={{
-              width: 26, height: 26, borderRadius: 6,
-              color: theme.textTertiary, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: `0.5px solid ${theme.border}`, background: 'transparent', cursor: 'pointer', padding: 0,
-            }}>
-              <svg width={12} height={12} viewBox="0 0 14 14" fill="none">
-                <rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                <line x1="4.5" y1="4" x2="9.5" y2="4" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                <line x1="4.5" y1="6.5" x2="9.5" y2="6.5" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                <line x1="4.5" y1="9" x2="7.5" y2="9" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-              </svg>
-            </button>
-          )}
-          {onMove && (
-            <button onClick={() => onMove(task.id)} title="Move to tomorrow" style={{
-              width: 26, height: 26, borderRadius: 6, fontSize: 11,
-              color: theme.textTertiary, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: `0.5px solid ${theme.border}`, background: 'transparent', cursor: 'pointer', padding: 0,
+        <div className="ta" style={{ display: 'flex', gap: 3, flexShrink: 0, alignItems: 'center' }}>
+          <button onClick={startEdit} style={{ ...AB(t), fontSize: 10, color: t.textSecondary, fontWeight: 500 }}>Edit</button>
+          <button onClick={() => onNote && onNote(task)} style={{ ...AB(t), color: tc.dot }}>
+            <NpIcon has={hN} color={tc.dot} size={11} />
+          </button>
+          {isScheduled ? (
+            <button onClick={() => onUpdate(task.id, { slot: null })} style={{ ...AB(t), color: t.textSecondary, fontSize: 13 }}>↩</button>
+          ) : (
+            <button onClick={onMove ? () => onMove(task.id) : undefined} style={{
+              ...AB(t),
+              color: onMove ? t.textSecondary : t.textTertiary,
+              opacity: onMove ? 1 : 0.35,
+              cursor: onMove ? 'pointer' : 'default',
+              fontSize: 13,
             }}>→</button>
           )}
-          <button onClick={() => onDelete(task.id)} title="Delete" style={{
-            width: 26, height: 26, borderRadius: 6, fontSize: 11,
-            color: theme.danger, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: `0.5px solid ${theme.danger}40`, background: 'transparent', cursor: 'pointer', padding: 0,
-          }}>×</button>
+          <button onClick={() => onDelete(task.id)} style={{ ...AB(t), color: '#E24B4A', fontSize: 13 }}>×</button>
         </div>
       )}
     </div>

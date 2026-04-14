@@ -9,7 +9,7 @@ function getGreeting() {
   return 'Good evening';
 }
 
-export default function GreetingCard({ date, onDateChange, tasks, calView, onCalViewChange }) {
+export default function GreetingCard({ date, onDateChange, tasks, deadlines, calView, onCalViewChange }) {
   const { theme } = useTheme();
 
   const total = tasks.length;
@@ -82,7 +82,7 @@ export default function GreetingCard({ date, onDateChange, tasks, calView, onCal
       {calView === 'week' ? (
         <WeekStrip date={date} onDateChange={onDateChange} tasks={tasks} />
       ) : (
-        <MonthCalendar date={date} onDateChange={onDateChange} tasks={tasks} />
+        <MonthCalendar date={date} onDateChange={onDateChange} tasks={tasks} deadlines={deadlines} />
       )}
     </div>
   );

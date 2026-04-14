@@ -325,6 +325,7 @@ export default function DashboardPage() {
       date={date}
       onDateChange={setDate}
       tasks={dayTasks}
+      deadlines={deadlines}
       calView={calView}
       onCalViewChange={setCalView}
     />
@@ -381,6 +382,7 @@ export default function DashboardPage() {
       onUpdate={handleUpdate}
       onMove={handleMove}
       onDrop={handleUnschedule}
+      onEditDeadline={handleEditDeadline}
     />
   );
 
@@ -421,7 +423,7 @@ export default function DashboardPage() {
 
   // ── Wide (desktop) layout ──────────────────────────
   return (
-    <div style={{ padding: '14px 20px', overflow: 'hidden' }}>
+    <div style={{ flex: 1, minHeight: 0, padding: '14px 20px', overflow: 'hidden' }}>
       <div style={{
         display: 'grid',
         gridTemplateColumns: '25% minmax(0,1fr) minmax(0,1fr)',
@@ -453,22 +455,16 @@ export default function DashboardPage() {
         </div>
 
         {/* Middle column */}
-        <div style={{
-          display: 'flex', flexDirection: 'column', gap: 0, minHeight: 0,
-        }}>
-          <div style={{ marginBottom: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, minHeight: 0 }}>
+          <div style={{ flexShrink: 0, marginBottom: 10 }}>
             {addTaskForm}
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-            {taskList}
-            {dayNoteCard}
-          </div>
+          {taskList}
+          {dayNoteCard}
         </div>
 
         {/* Right column */}
-        <div>
-          {daySchedule}
-        </div>
+        {daySchedule}
       </div>
 
       {/* Modals and overlays */}

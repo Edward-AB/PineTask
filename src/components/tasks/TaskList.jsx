@@ -2,28 +2,45 @@ import { useState } from 'react';
 import { useTheme } from '../../hooks/useTheme.js';
 import { dateKey } from '../../utils/dates.js';
 import TaskItem from './TaskItem.jsx';
+import DeadlineItem from '../deadlines/DeadlineItem.jsx';
 
 export default function TaskList({
   date, tasks, allTasks, deadlines,
   onToggle, onDelete, onNote, onUpdate, onMove, onDrop,
+  onEditDeadline,
 }) {
   const { theme } = useTheme();
   const dayStr = dateKey(date);
   const todayStr = dateKey(new Date());
   const [overUnsch, setOverUnsch] = useState(false);
+  const [expTodDl, setExpTodDl] = useState(null);
 
   // Tasks for this day
   const dayTasks = (tasks || []).filter((t) => t.date === dayStr);
 
-  // Overdue: past incomplete tasks (shown when viewing today)
-  const overdueTasks = dayStr === todayStr
-    ? (allTasks || tasks || []).filter((t) => t.date < todayStr && !t.done)
-    : [];
+  // Unscheduled / scheduled — ALL tasks including deadline-linked (matches v1)
+  const unsch = dayTasks.filter((t) => t.slot == null);
+  const sched = dayTasks.filter((t) => t.slot != null).sort((a, b) => a.slot - b.slot);
 
-  // Sections
-  const deadlineTasks = dayTasks.filter((t) => t.deadlineId || t.deadline_id);
-  const unscheduled = dayTasks.filter((t) => !(t.deadlineId || t.deadline_id) && t.slot == null);
-  const scheduled = dayTasks.filter((t) => !(t.deadlineId || t.deadline_id) && t.slot != null).sort((a, b) => a.slot - b.slot);
+  // All tasks for a deadline (across all dates)
+  const allTFDl = (dlId) => (allTasks || []).filter((t) => (t.deadlineId || t.deadline_id) === dlId);
+
+  // Deadline sections — v1 lines 635-643
+  const dueTodayDl = (deadlines || []).filter((dl) => (dl.date || dl.due_date) === dayStr);
+  const dueTodayIds = new Set(dueTodayDl.map((d) => d.id));
+  const activeDl = (deadlines || []).filter((dl) =>
+    dayTasks.some((task) => (task.deadlineId || task.deadline_id) === dl.id && task.slot != null)
+  );
+  const scheduledOnlyDl = activeDl.filter((dl) => !dueTodayIds.has(dl.id));
+  const overdueDl = dayStr >= todayStr
+    ? (deadlines || []).filter((dl) => {
+        const dlDate = dl.date || dl.due_date;
+        if (!dlDate || dlDate >= todayStr) return false;
+        const allT = allTFDl(dl.id);
+        if (allT.length === 0) return false;
+        return !allT.every((x) => x.done);
+      })
+    : [];
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -31,7 +48,7 @@ export default function TaskList({
     setOverUnsch(true);
   };
   const handleDragLeave = () => setOverUnsch(false);
-  const handleDrop = (e) => {
+  const handleDrop2 = (e) => {
     e.preventDefault();
     setOverUnsch(false);
     const taskId = e.dataTransfer.getData('text/plain');
@@ -39,87 +56,53 @@ export default function TaskList({
   };
 
   const itemProps = { deadlines, onToggle, onDelete, onNote, onUpdate, onMove };
+  const dlColor = (dl) => theme.deadline[(dl.color_idx ?? dl.colorIdx ?? 0) % theme.deadline.length];
 
-  const totalVisible = overdueTasks.length + dayTasks.length;
-
-  // Section label matching v1: fontSize 10, fontWeight 500, uppercase, letterSpacing 0.08em
-  const sectionLabel = (text, color) => (
+  // Deadline section label with colored dot — v1 style
+  const dlSectionLabel = (text, color, dotColor) => (
     <div style={{
-      fontSize: theme.font.label, fontWeight: 500, color: color || theme.textTertiary,
+      fontSize: 10, fontWeight: 500, color: color || theme.textTertiary,
+      letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6,
+      display: 'flex', alignItems: 'center', gap: 6,
+    }}>
+      <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: dotColor }} />
+      {text}
+    </div>
+  );
+
+  // Simple section label (no dot) — v1 style
+  const sectionLabel = (text) => (
+    <div style={{
+      fontSize: 10, fontWeight: 500, color: theme.textTertiary,
       letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6,
     }}>{text}</div>
   );
 
-  // Divider between sections matching v1
   const divider = () => (
     <div style={{ height: '0.5px', background: theme.hourRule || theme.borderLight, margin: '8px 0' }} />
   );
 
-  // Track which sections exist so we can add dividers between them
-  const sections = [];
+  const renderDlItem = (dl, tasksForDl) => (
+    <DeadlineItem
+      key={dl.id}
+      deadline={dl}
+      color={dlColor(dl)}
+      allTasks={tasksForDl || allTFDl(dl.id)}
+      expanded={expTodDl === dl.id}
+      onToggle={() => setExpTodDl(expTodDl === dl.id ? null : dl.id)}
+      onRemove={() => {}}
+      onSaveEdit={(updated) => onEditDeadline?.(updated.id, { title: updated.title, due_date: updated.due_date, color_idx: updated.color_idx })}
+      showRemove={false}
+      theme={theme}
+    />
+  );
 
-  if (overdueTasks.length > 0) {
-    sections.push(
-      <div key="overdue">
-        {sectionLabel(`Overdue \u00B7 ${overdueTasks.length}`, theme.danger)}
-        {overdueTasks.map((t) => (
-          <TaskItem key={t.id} task={t} {...itemProps} />
-        ))}
-      </div>
-    );
-  }
-
-  if (deadlineTasks.length > 0) {
-    sections.push(
-      <div key="deadline">
-        {sectionLabel('Deadline tasks scheduled today')}
-        <DeadlineTaskCards deadlineTasks={deadlineTasks} deadlines={deadlines} theme={theme} itemProps={itemProps} />
-      </div>
-    );
-  }
-
-  // Empty state or unscheduled section
-  if (totalVisible === 0) {
-    sections.push(
-      <div key="empty" style={{ fontSize: 12, color: theme.textTertiary, padding: '4px 0', marginBottom: 6 }}>
-        Add a task above to get started.
-      </div>
-    );
-  } else if (unscheduled.length === 0 && dayTasks.length > 0) {
-    sections.push(
-      <div key="all-scheduled" style={{ fontSize: 12, color: theme.textTertiary, padding: '4px 0', marginBottom: 6 }}>
-        All tasks scheduled!
-      </div>
-    );
-  } else if (unscheduled.length > 0) {
-    sections.push(
-      <div key="unscheduled">
-        {sectionLabel(`Unscheduled \u00B7 ${unscheduled.length}`)}
-        {unscheduled.map((t) => (
-          <TaskItem key={t.id} task={t} {...itemProps} />
-        ))}
-      </div>
-    );
-  }
-
-  if (scheduled.length > 0) {
-    sections.push(
-      <div key="scheduled">
-        {sectionLabel(`Scheduled \u00B7 ${scheduled.length}`)}
-        {scheduled.map((t) => (
-          <TaskItem key={t.id} task={t} {...itemProps} />
-        ))}
-      </div>
-    );
-  }
-
-  // Render all sections inside ONE card, with dividers between them
   return (
     <div
       className="col-scroll"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      onDrop={handleDrop2}
       style={{
         overflowY: 'auto',
         maxHeight: 'calc(100vh - 280px)',
@@ -129,80 +112,53 @@ export default function TaskList({
         background: theme.bgSecondary,
       }}
     >
-      {sections.map((section, i) => (
-        <div key={section.key}>
-          {i > 0 && divider()}
-          {section}
+      {/* Overdue deadlines */}
+      {overdueDl.length > 0 && (<>
+        {dlSectionLabel('Overdue', '#E24B4A', '#E24B4A')}
+        {overdueDl.map((dl) => renderDlItem(dl))}
+        {divider()}
+      </>)}
+
+      {/* Due today deadlines */}
+      {dueTodayDl.length > 0 && (<>
+        {dlSectionLabel('Due today', theme.textTertiary, theme.accent)}
+        {dueTodayDl.map((dl) => renderDlItem(dl))}
+        {divider()}
+      </>)}
+
+      {/* Deadline tasks scheduled today (not due today) */}
+      {scheduledOnlyDl.length > 0 && (<>
+        {dlSectionLabel('Deadline tasks scheduled today', theme.textTertiary, theme.accentBorder)}
+        {scheduledOnlyDl.map((dl) => renderDlItem(dl, dayTasks.filter((task) => (task.deadlineId || task.deadline_id) === dl.id && task.slot != null)))}
+        {divider()}
+      </>)}
+
+      {/* Empty / All scheduled */}
+      {dayTasks.length === 0 && (
+        <div style={{ fontSize: 12, color: theme.textTertiary, padding: '4px 0', marginBottom: 6 }}>
+          Add a task above to get started.
         </div>
-      ))}
-    </div>
-  );
-}
+      )}
+      {unsch.length === 0 && dayTasks.length > 0 && (
+        <div style={{ fontSize: 12, color: theme.textTertiary, padding: '4px 0', marginBottom: 6 }}>
+          All tasks scheduled!
+        </div>
+      )}
 
-/** Grouped deadline cards -- show deadline as collapsed card, expand to see tasks */
-function DeadlineTaskCards({ deadlineTasks, deadlines, theme, itemProps }) {
-  const [expanded, setExpanded] = useState({});
+      {/* Unscheduled tasks */}
+      {unsch.length > 0 && (<>
+        {sectionLabel(`Unscheduled \u00B7 ${unsch.length}`)}
+        {unsch.map((t) => <TaskItem key={t.id} task={t} {...itemProps} />)}
+      </>)}
 
-  // Group tasks by deadline
-  const groups = {};
-  deadlineTasks.forEach((t) => {
-    const dlId = t.deadlineId || t.deadline_id;
-    if (!groups[dlId]) groups[dlId] = [];
-    groups[dlId].push(t);
-  });
-
-  const daysLeft = (dl) => {
-    if (!dl.due_date) return null;
-    const diff = Math.ceil((new Date(dl.due_date) - new Date()) / 86400000);
-    if (diff < 0) return 'overdue';
-    if (diff === 0) return 'due today';
-    return `${diff}d left`;
-  };
-
-  return (
-    <div>
-      {Object.entries(groups).map(([dlId, tasks]) => {
-        const dl = (deadlines || []).find((d) => d.id === dlId);
-        const dlc = dl ? theme.deadline[(dl.color_idx ?? 0) % theme.deadline.length] : null;
-        const isOpen = expanded[dlId];
-
-        return (
-          <div key={dlId} style={{ marginBottom: 5 }}>
-            <button
-              onClick={() => setExpanded((e) => ({ ...e, [dlId]: !e[dlId] }))}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 10px', borderRadius: theme.radius.sm,
-                border: `0.5px solid ${dlc?.border || theme.border}`,
-                background: dlc?.bg || theme.bgTertiary,
-                cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
-              }}
-            >
-              <span style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: dlc?.dot || theme.accent, flexShrink: 0,
-              }} />
-              <span style={{ flex: 1, fontSize: theme.font.body, fontWeight: 500, color: dlc?.text || theme.textPrimary }}>
-                {dl?.title || 'Deadline'}
-              </span>
-              <span style={{ fontSize: theme.font.label, color: dlc?.text || theme.textTertiary, opacity: 0.7 }}>
-                {tasks.length} task{tasks.length !== 1 ? 's' : ''}
-                {dl && daysLeft(dl) && ` \u00B7 ${daysLeft(dl)}`}
-              </span>
-              <span style={{ fontSize: 10, color: dlc?.text || theme.textTertiary, transition: 'transform 200ms', transform: isOpen ? 'rotate(180deg)' : 'rotate(0)' }}>
-                {'\u25BC'}
-              </span>
-            </button>
-            {isOpen && (
-              <div style={{ marginTop: 4, paddingLeft: 12 }}>
-                {tasks.map((t) => (
-                  <TaskItem key={t.id} task={t} {...itemProps} />
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {/* Scheduled tasks */}
+      {sched.length > 0 && (
+        <div>
+          {divider()}
+          {sectionLabel(`Scheduled \u00B7 ${sched.length}`)}
+          {sched.map((t) => <TaskItem key={t.id} task={t} {...itemProps} />)}
+        </div>
+      )}
     </div>
   );
 }

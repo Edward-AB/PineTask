@@ -7,7 +7,7 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-export default function MonthCalendar({ date, onDateChange, tasks }) {
+export default function MonthCalendar({ date, onDateChange, tasks, deadlines }) {
   const { theme } = useTheme();
   const selectedKey = dateKey(date);
   const todayStr = dateKey(new Date());
@@ -109,7 +109,7 @@ export default function MonthCalendar({ date, onDateChange, tasks }) {
           const dayTasks = tasksByDate[key] || [];
           const cnt = dayTasks.length;
           const doneCount = dayTasks.filter((t) => t.done).length;
-          const hasDeadline = dayTasks.some((t) => t.deadlineId);
+          const hasDeadline = (deadlines || []).some((dl) => (dl.date || dl.due_date) === key);
 
           return (
             <button

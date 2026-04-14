@@ -1,91 +1,88 @@
 import { useState } from 'react';
-import { useTheme } from '../../hooks/useTheme.js';
 import { daysUntil, formatShortDate } from '../../utils/dates.js';
 
-export default function DeadlineItem({ deadline, tasks = [], onDelete, onEdit }) {
-  const { theme } = useTheme();
-  const [expanded, setExpanded] = useState(false);
-  const dlc = theme.deadline[deadline.color_idx % theme.deadline.length];
-  const dlTasks = tasks.filter(t => t.deadline_id === deadline.id);
-  const doneTasks = dlTasks.filter(t => t.done).length;
-  const totalTasks = dlTasks.length;
-  const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
-  const days = daysUntil(deadline.due_date);
-  const overdue = days !== null && days < 0 && pct < 100;
+/* ── MiniPie — exact port from v1 lines 96-102 ── */
+function MiniPie({ pct, color, size = 26 }) {
+  const r = 11, cx = 14, cy = 14;
+  if (pct >= 100) return <svg width={size} height={size} viewBox="0 0 28 28"><circle cx={cx} cy={cy} r={r} fill={color} opacity={0.25}/><circle cx={cx} cy={cy} r={r} fill={color}/><path d="M9 14l3 3 7-7" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>;
+  if (pct <= 0) return <svg width={size} height={size} viewBox="0 0 28 28"><circle cx={cx} cy={cy} r={r} fill={color} opacity={0.2}/></svg>;
+  const sw = (pct / 100) * 2 * Math.PI, x1 = cx + r * Math.cos(-Math.PI / 2), y1 = cy + r * Math.sin(-Math.PI / 2), x2 = cx + r * Math.cos(-Math.PI / 2 + sw), y2 = cy + r * Math.sin(-Math.PI / 2 + sw);
+  return <svg width={size} height={size} viewBox="0 0 28 28"><circle cx={cx} cy={cy} r={r} fill={color} opacity={0.2}/><path d={`M${cx},${cy} L${x1},${y1} A${r},${r},0,${sw > Math.PI ? 1 : 0},1,${x2},${y2} Z`} fill={color}/></svg>;
+}
 
+/* ── DlColorPicker — exact port from v1 lines 327-329 ── */
+function DlColorPicker({ DLC, value, onChange, theme }) {
+  const c = DLC[value];
+  const NAMES = ["Amber", "Rose", "Teal", "Coral", "Stone", "Sage"];
   return (
-    <div style={{
-      borderRadius: theme.radius.md, border: `1px solid ${dlc.border}30`,
-      background: dlc.bg, padding: '10px 12px', cursor: 'pointer',
-    }} onClick={() => setExpanded(!expanded)}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <svg width={26} height={26} viewBox="0 0 28 28" style={{ flexShrink: 0 }}>
-          {pct >= 100 ? (
-            <>
-              <circle cx={14} cy={14} r={11} fill={dlc.dot} opacity={0.25} />
-              <circle cx={14} cy={14} r={11} fill={dlc.dot} />
-              <path d="M9 14l3 3 7-7" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </>
-          ) : pct <= 0 ? (
-            <circle cx={14} cy={14} r={11} fill={dlc.dot} opacity={0.2} />
-          ) : (() => {
-            const r = 11, cx = 14, cy = 14;
-            const sw = (pct / 100) * 2 * Math.PI;
-            const x1 = cx + r * Math.cos(-Math.PI / 2);
-            const y1 = cy + r * Math.sin(-Math.PI / 2);
-            const x2 = cx + r * Math.cos(-Math.PI / 2 + sw);
-            const y2 = cy + r * Math.sin(-Math.PI / 2 + sw);
-            return (
-              <>
-                <circle cx={cx} cy={cy} r={r} fill={dlc.dot} opacity={0.2} />
-                <path d={`M${cx},${cy} L${x1},${y1} A${r},${r},0,${sw > Math.PI ? 1 : 0},1,${x2},${y2} Z`} fill={dlc.dot} />
-              </>
-            );
-          })()}
-        </svg>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: theme.font.body, fontWeight: 500, color: dlc.text }}>{deadline.title}</div>
-          <div style={{ fontSize: theme.font.label, color: dlc.text, opacity: 0.7, marginTop: 2 }}>
-            {overdue ? (
-              <span style={{ color: theme.danger, fontWeight: 600 }}>OVERDUE</span>
-            ) : days !== null ? (
-              days === 0 ? 'Due today' : days === 1 ? 'Due tomorrow' : `${days} days left`
-            ) : ''}
-            {totalTasks > 0 && ` · ${doneTasks}/${totalTasks} tasks`}
-          </div>
-        </div>
-        <span style={{ fontSize: 11, color: dlc.text, opacity: 0.5 }}>{expanded ? '▾' : '▸'}</span>
-      </div>
+    <div style={{ position: "relative", marginBottom: 8 }}>
+      <select value={value} onChange={e => onChange(Number(e.target.value))} style={{ width: "100%", fontSize: 12, borderRadius: 7, border: `1.5px solid ${c.border}`, padding: "5px 8px", background: c.bg, color: c.text, cursor: "pointer", outline: "none", appearance: "none" }}>
+        {DLC.map((dc, i) => <option key={i} value={i}>{NAMES[i]}</option>)}
+      </select>
+      <div style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 10, color: c.text }}>▾</div>
+    </div>
+  );
+}
 
-      {expanded && (
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${dlc.border}30` }}>
-          <div style={{ fontSize: theme.font.bodySmall, color: dlc.text, opacity: 0.7, marginBottom: 6 }}>
-            {formatShortDate(deadline.start_date)} → {formatShortDate(deadline.due_date)}
-          </div>
-          {dlTasks.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {dlTasks.map(t => (
-                <div key={t.id} style={{ fontSize: theme.font.bodySmall, color: dlc.text, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ opacity: t.done ? 0.5 : 1 }}>{t.done ? '✓' : '○'}</span>
-                  <span style={{ textDecoration: t.done ? 'line-through' : 'none', opacity: t.done ? 0.5 : 1 }}>{t.text}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div style={{ fontSize: theme.font.bodySmall, color: dlc.text, opacity: 0.5 }}>No tasks linked</div>
-          )}
-          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            {onEdit && <button onClick={e => { e.stopPropagation(); onEdit(deadline); }} style={{
-              fontSize: theme.font.label, padding: '3px 10px', borderRadius: theme.radius.sm,
-              border: `1px solid ${dlc.border}40`, color: dlc.text,
-            }}>Edit</button>}
-            {onDelete && <button onClick={e => { e.stopPropagation(); onDelete(deadline.id); }} style={{
-              fontSize: theme.font.label, padding: '3px 10px', borderRadius: theme.radius.sm,
-              border: `1px solid ${theme.danger}40`, color: theme.danger,
-            }}>Delete</button>}
+/* ── DeadlineItem — exact port from v1 lines 331-358 ──
+   Props:
+     deadline  — deadline object (id, title, due_date, start_date, color_idx, description)
+     color     — the deadline color object: theme.deadline[dl.color_idx % 6]
+     allTasks  — tasks linked to this deadline (already filtered by parent)
+     expanded  — boolean, controlled by parent
+     onToggle  — () => void, toggle expand
+     onRemove  — () => void, remove deadline
+     onSaveEdit — (updatedDeadline) => void
+     showRemove — boolean
+     theme     — full theme object
+*/
+export default function DeadlineItem({ deadline, color, allTasks, expanded, onToggle, onRemove, onSaveEdit, showRemove, theme }) {
+  const c = color;
+  const P = theme.priority;
+  const DLC = theme.deadline;
+  const ddn = allTasks.filter(x => x.done).length, dtt = allTasks.length, pct = dtt > 0 ? Math.round(ddn / dtt * 100) : 0;
+  const days = daysUntil(deadline.due_date), ov = days !== null && days < 0, urg = days !== null && days <= 3 && days >= 0;
+  const [editing, setEditing] = useState(false);
+  const [eTitle, setETitle] = useState(deadline.title);
+  const [eDate, setEDate] = useState(deadline.due_date);
+  const [eColor, setEColor] = useState(deadline.color_idx ?? 0);
+  return (
+    <div style={{ borderRadius: 10, border: `0.5px solid ${c.border}`, background: c.bg + "99", marginBottom: 8, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 10px", cursor: "pointer" }} onClick={onToggle}>
+        <MiniPie pct={pct} color={c.dot} size={26}/>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: c.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{deadline.title}</div>
+          <div style={{ fontSize: 10, color: ov ? "#E24B4A" : urg ? "#C07010" : c.dot, marginTop: 1 }}>
+            {ov ? `${Math.abs(days)}d overdue` : days === 0 ? "Due today" : days === 1 ? "Due tomorrow" : `${days}d left`}
           </div>
         </div>
-      )}
+        <span style={{ fontSize: 11, color: c.dot, flexShrink: 0 }}>{expanded ? "▴" : "▾"}</span>
+      </div>
+      {expanded && (<div style={{ borderTop: `0.5px solid ${c.border}`, padding: "10px" }}>
+        {editing ? (<div>
+          <input value={eTitle} onChange={e => setETitle(e.target.value)} style={{ width: "100%", fontSize: 12, borderRadius: 7, border: `0.5px solid ${c.border}`, padding: "5px 8px", background: "transparent", color: c.text, marginBottom: 5, boxSizing: "border-box", outline: "none" }}/>
+          <input type="date" value={eDate} onChange={e => setEDate(e.target.value)} style={{ width: "100%", fontSize: 11, borderRadius: 7, border: `0.5px solid ${c.border}`, padding: "5px 6px", background: "transparent", color: c.text, boxSizing: "border-box", outline: "none", marginBottom: 5 }}/>
+          <DlColorPicker DLC={DLC} value={eColor} onChange={setEColor} theme={theme}/>
+          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+            <button onClick={() => { onSaveEdit({ ...deadline, title: eTitle, due_date: eDate, color_idx: eColor }); setEditing(false); }} style={{ flex: 1, fontSize: 11, padding: "5px 0", borderRadius: 7, border: "none", background: c.dot, color: "#fff", cursor: "pointer" }}>Save</button>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, fontSize: 11, padding: "5px 0", borderRadius: 7, border: `0.5px solid ${c.border}`, background: "transparent", color: c.text, cursor: "pointer" }}>Cancel</button>
+          </div>
+        </div>) : (<>
+          <div style={{ fontSize: 11, color: c.text, marginBottom: 6 }}>Due: {formatShortDate(deadline.due_date)}</div>
+          <div style={{ fontSize: 11, color: c.text, marginBottom: 6 }}>{ddn}/{dtt} tasks complete</div>
+          <div style={{ height: 5, borderRadius: 4, background: c.border + "44", overflow: "hidden", marginBottom: 8 }}>
+            <div style={{ height: "100%", width: `${pct}%`, background: c.dot, borderRadius: 4 }}/>
+          </div>
+          {allTasks.map(x => (<div key={x.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, padding: "3px 0" }}>
+            <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: P[x.priority || "none"].dot, flexShrink: 0 }}/>
+            <span style={{ flex: 1, color: x.done ? theme.textTertiary : c.text, textDecoration: x.done ? "line-through" : "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.text}</span>
+          </div>))}
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <button onClick={() => setEditing(true)} style={{ fontSize: 10, color: c.text, background: "none", border: `0.5px solid ${c.border}`, borderRadius: 5, padding: "2px 8px", cursor: "pointer" }}>Edit</button>
+            {showRemove && <button onClick={onRemove} style={{ fontSize: 10, color: "#E24B4A", background: "none", border: "0.5px solid #E24B4A", borderRadius: 5, padding: "2px 8px", cursor: "pointer" }}>Remove</button>}
+          </div>
+        </>)}
+      </div>)}
     </div>
   );
 }
