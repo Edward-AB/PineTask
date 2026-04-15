@@ -1,4 +1,5 @@
 import { verifyToken } from './_helpers/jwt.js';
+import { findUserByApiKey } from './_helpers/apikey.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -51,15 +52,34 @@ export async function onRequest(context) {
       return addCorsHeaders(Response.json({ error: 'Unauthorized' }, { status: 401 }));
     }
 
+    // Try JWT first. If it doesn't look like a JWT or fails, try API key.
+    let authed = false;
     try {
       const payload = await verifyToken(token, env.JWT_SECRET);
-      if (!payload) {
-        return addCorsHeaders(Response.json({ error: 'Invalid or expired token' }, { status: 401 }));
+      if (payload) {
+        context.data.userId = payload.userId;
+        context.data.isAdmin = !!payload.isAdmin;
+        context.data.authMethod = 'jwt';
+        authed = true;
       }
-      context.data.userId = payload.userId;
-      context.data.isAdmin = !!payload.isAdmin;
     } catch {
-      return addCorsHeaders(Response.json({ error: 'Invalid token' }, { status: 401 }));
+      // fall through to api-key attempt
+    }
+    if (!authed && token.startsWith('ptk_')) {
+      try {
+        const byKey = await findUserByApiKey(env, token);
+        if (byKey) {
+          context.data.userId = byKey.userId;
+          context.data.isAdmin = byKey.isAdmin;
+          context.data.authMethod = 'api_key';
+          authed = true;
+        }
+      } catch {
+        // treat as invalid
+      }
+    }
+    if (!authed) {
+      return addCorsHeaders(Response.json({ error: 'Invalid or expired token' }, { status: 401 }));
     }
 
     // Admin route protection
