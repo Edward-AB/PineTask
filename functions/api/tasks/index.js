@@ -3,18 +3,45 @@ export async function onRequestGet({ request, env, data }) {
     const url = new URL(request.url);
     const from = url.searchParams.get('from');
     const to = url.searchParams.get('to');
+    const status = url.searchParams.get('status');
 
-    if (!from || !to) {
-      return Response.json({ error: 'from and to date params are required' }, { status: 400 });
+    // Two supported query shapes:
+    //   ?from=YYYY-MM-DD&to=YYYY-MM-DD  → date-bounded (internal app use)
+    //   ?status=pending|completed|all   → status-filtered (public API)
+    const hasDateRange = !!(from && to);
+    const hasStatus = status !== null;
+
+    if (!hasDateRange && !hasStatus) {
+      return Response.json(
+        { error: 'either (from & to) or status query params are required' },
+        { status: 400 }
+      );
+    }
+
+    let clause = '';
+    const params = [data.userId];
+    if (hasDateRange) {
+      clause += ' AND date >= ? AND date <= ?';
+      params.push(from, to);
+    }
+    if (hasStatus) {
+      const s = status.toLowerCase();
+      if (s === 'pending') clause += ' AND done = 0';
+      else if (s === 'completed') clause += ' AND done = 1';
+      else if (s !== 'all') {
+        return Response.json({
+          error: 'status must be pending | completed | all',
+        }, { status: 400 });
+      }
     }
 
     const tasks = await env.DB.prepare(`
       SELECT id, parent_task_id, deadline_id, project_id, date, text, priority,
              duration, slot, done, done_at, color_id, note, sort_order, created_at, updated_at
       FROM tasks
-      WHERE user_id = ? AND date >= ? AND date <= ?
+      WHERE user_id = ?${clause}
       ORDER BY sort_order ASC, created_at ASC
-    `).bind(data.userId, from, to).all();
+    `).bind(...params).all();
 
     // Enrich with team information (direct assignment OR via project-team assignment)
     const results = tasks.results || [];
